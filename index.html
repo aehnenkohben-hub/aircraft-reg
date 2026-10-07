@@ -1129,7 +1129,7 @@
                 <button type="button" class="button secondary" id="addTripBtn">Add Another Trip</button>
             </div>
             
-            <div class="history-container" id="sightingsSection">
+            <div class="history-container hidden" id="sightingsSection">
                 <div class="history-title">Sightings</div>
                 <div id="sightingsContainer"></div>
                 <button type="button" class="button secondary" id="addSightingBtn">Add Another Sighting</button>
@@ -1249,6 +1249,7 @@
         const tripsContainer = document.getElementById('tripsContainer');
         const addSightingBtn = document.getElementById('addSightingBtn');
         const sightingsContainer = document.getElementById('sightingsContainer');
+        const sightingsSection = document.getElementById('sightingsSection');
         const sortFilter = document.getElementById('sortFilter');
         const importBtn = document.getElementById('importBtn');
         const exportBtn = document.getElementById('exportBtn');
@@ -1277,7 +1278,6 @@
             setLandingTab('log');
             addHistoryItem('', '', true);
             addTripItem('', '', '', true);
-            addSightingItem('', '', true);
         }
         
         function loadAircraftData() {
@@ -1423,7 +1423,7 @@
             if (!isEdit) {
                 addHistoryItem('', '', true);
                 addTripItem('', '', '', true);
-                addSightingItem('', '', true);
+                syncSightingsSection();
                 hideLookupPicker(createMainFormLookupContext());
                 setLookupStatus(document.getElementById('regLookupStatus'), '', null);
                 setTimeout(() => {
@@ -1477,6 +1477,60 @@
             return [...new Set(variants)];
         }
 
+        function todayDateInputValue() {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function getLogFormSightingsUI(formRoot) {
+            if (formRoot) {
+                return {
+                    section: formRoot.querySelector('#sightingsSection_random'),
+                    container: formRoot.querySelector('#sightingsContainer_random'),
+                    historyContainer: formRoot.querySelector('#historyItemsContainer_random')
+                };
+            }
+            return {
+                section: sightingsSection,
+                container: sightingsContainer,
+                historyContainer: historyItemsContainer
+            };
+        }
+
+        function formHasSeenRegistration(formRoot) {
+            const { historyContainer } = getLogFormSightingsUI(formRoot);
+            if (!historyContainer) return false;
+            return Array.from(historyContainer.querySelectorAll('.seen-checkbox')).some(cb => cb.checked);
+        }
+
+        function syncSightingsSection(formRoot = null, scrollIntoView = false) {
+            const ui = getLogFormSightingsUI(formRoot);
+            if (!ui.section || !ui.container) return;
+
+            const seen = formHasSeenRegistration(formRoot);
+            if (!seen) {
+                ui.container.querySelectorAll('.history-item').forEach(item => {
+                    const loc = item.querySelector('.sighting-location')?.value?.trim();
+                    const date = item.querySelector('.sighting-date')?.value?.trim();
+                    if (!loc && !date) item.remove();
+                });
+            }
+
+            const hasRows = ui.container.querySelectorAll('.history-item').length > 0;
+            const show = seen || hasRows;
+            ui.section.classList.toggle('hidden', !show);
+            if (seen && !ui.container.querySelector('.history-item')) {
+                if (formRoot) addSightingItemRandom('', '', true, formRoot);
+                else addSightingItem('', '', true);
+            }
+            if (scrollIntoView && seen) {
+                ui.section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
         function setLookupStatus(statusEl, message, kind) {
             if (!statusEl) return;
             statusEl.textContent = message || '';
@@ -1517,24 +1571,44 @@
             return record;
         }
 
-        /** One API row can yield registered owner vs operator flag as separate choices. */
-        function lookupRecordsFromRaw(raw, source) {
+        /** Registered owner plus airline name(s) from operator flag (ADSBdb /airline). */
+        async function lookupRecordsFromAircraft(raw) {
             const records = [];
-            const base = normalizeLookupRecord(raw, source);
-            records.push({ ...base, source: `${source} · owner` });
+            const seen = new Set();
+            const base = normalizeLookupRecord(raw, 'ADSBdb');
+            const ownerName = base.operator.trim();
+
+            function pushRecord(rec) {
+                if (!rec.registration && !rec.operator && !rec.displayType) return;
+                const key = `${rec.operator.toLowerCase()}|${rec.displayType.toLowerCase()}|${rec.registration}`;
+                if (seen.has(key)) return;
+                seen.add(key);
+                records.push(rec);
+            }
+
+            if (ownerName || base.displayType) {
+                pushRecord({ ...base, source: 'ADSBdb' });
+            }
 
             const flag = (raw.registered_owner_operator_flag_code || raw.OperatorFlagCode || '').trim();
-            if (!flag) return records;
+            if (flag) {
+                try {
+                    const res = await fetch(`https://api.adsbdb.com/v0/airline/${encodeURIComponent(flag)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const airlines = Array.isArray(data.response) ? data.response : [];
+                        for (const airline of airlines) {
+                            const name = (airline.name || '').trim();
+                            if (!name) continue;
+                            if (ownerName && name.toLowerCase() === ownerName.toLowerCase()) continue;
+                            pushRecord({ ...base, operator: name, source: 'ADSBdb' });
+                        }
+                    }
+                } catch (err) {
+                    console.warn('ADSBdb airline lookup failed:', err);
+                }
+            }
 
-            const ownerLower = base.operator.toLowerCase();
-            const flagLower = flag.toLowerCase();
-            if (flagLower === ownerLower || ownerLower.includes(flagLower)) return records;
-
-            records.push({
-                ...base,
-                operator: flag,
-                source: `${source} · operator code`
-            });
             return records;
         }
 
@@ -1543,10 +1617,10 @@
             const results = [];
             const seen = new Set();
 
-            function pushResult(raw, source) {
-                for (const rec of lookupRecordsFromRaw(raw, source)) {
+            async function pushAircraft(raw) {
+                for (const rec of await lookupRecordsFromAircraft(raw)) {
                     if (!rec.registration && !rec.operator && !rec.displayType) continue;
-                    const key = `${rec.source}|${rec.operator.toLowerCase()}|${rec.displayType.toLowerCase()}|${rec.registration}`;
+                    const key = `${rec.operator.toLowerCase()}|${rec.displayType.toLowerCase()}|${rec.registration}`;
                     if (seen.has(key)) continue;
                     seen.add(key);
                     results.push(rec);
@@ -1558,24 +1632,10 @@
                     const res = await fetch(`https://api.adsbdb.com/v0/aircraft/${encodeURIComponent(reg)}`);
                     if (res.ok) {
                         const data = await res.json();
-                        if (data.response?.aircraft) pushResult(data.response.aircraft, 'ADSBdb');
+                        if (data.response?.aircraft) await pushAircraft(data.response.aircraft);
                     }
                 } catch (err) {
                     console.warn('ADSBdb lookup failed:', err);
-                }
-            }
-
-            for (const reg of candidates) {
-                try {
-                    const hexRes = await fetch(`https://hexdb.io/reg-hex?reg=${encodeURIComponent(reg)}`);
-                    if (!hexRes.ok) continue;
-                    const hex = (await hexRes.text()).trim();
-                    if (!/^[0-9A-Fa-f]{6}$/.test(hex)) continue;
-                    const acRes = await fetch(`https://hexdb.io/api/v1/aircraft/${hex}`);
-                    if (!acRes.ok) continue;
-                    pushResult(await acRes.json(), 'hexdb');
-                } catch (err) {
-                    console.warn('hexdb lookup failed:', err);
                 }
             }
 
@@ -1686,7 +1746,7 @@
                 opt.value = String(index);
                 const operatorLabel = rec.operator || 'Unknown operator';
                 const typeLabel = rec.displayType || 'Unknown type';
-                opt.textContent = `${operatorLabel} — ${typeLabel} (${rec.source})`;
+                opt.textContent = `${operatorLabel} — ${typeLabel}`;
                 picker.appendChild(opt);
             });
             section.classList.toggle('hidden', results.length <= 1);
@@ -1806,7 +1866,7 @@
             };
         }
         
-        function addHistoryItem(registration, operator, isCurrent = false, isSeen = true) {
+        function addHistoryItem(registration, operator, isCurrent = false, isSeen = false) {
             const historyItem = document.createElement('div');
             historyItem.className = 'history-item history-reg-row';
             
@@ -1836,11 +1896,13 @@
             
             historyItemsContainer.appendChild(historyItem);
             
-            historyItem.querySelector('.history-reg').addEventListener('input', function() {
+            const regInputEl = historyItem.querySelector('.history-reg');
+            regInputEl.addEventListener('input', function() {
                 this.value = this.value.toUpperCase();
                 clearLookupUndo(historyItem);
                 hideRowLookupMatch(historyItem);
             });
+            attachRegistrationDuplicateCheck(regInputEl, null);
             const lookupContext = createMainFormLookupContext();
             attachRowLookupMatchPicker(historyItem, lookupContext);
             historyItem.querySelector('.lookup-reg-btn').addEventListener('click', (e) => {
@@ -1875,6 +1937,11 @@
                 
                 this.textContent = `✓ ${buttonText}`;
                 this.style.backgroundColor = '#34c759';
+
+                const regInput = historyItem.querySelector('.history-reg');
+                if (regInput && regInput.value.trim().length >= 3) {
+                    runRegistrationLookup(regInput, historyItem, lookupContext);
+                }
             });
             
             historyItem.querySelector('.set-seen-btn').addEventListener('click', function() {
@@ -1884,9 +1951,11 @@
                 if (seenCheckbox.checked) {
                     this.style.backgroundColor = '#5ac8fa';
                     this.textContent = '✓ Seen';
+                    syncSightingsSection(null, true);
                 } else {
                     this.style.backgroundColor = '#5ac8fa';
                     this.textContent = 'Seen';
+                    syncSightingsSection();
                 }
             });
             
@@ -1933,11 +2002,12 @@
             tripsContainer.innerHTML = '';
         }
         function addSightingItem(location, date, isFirst = false) {
+            const sightingDate = date || todayDateInputValue();
             const sightingItem = document.createElement('div');
             sightingItem.className = 'history-item';
             sightingItem.innerHTML = `
                 <input type="text" class="sighting-location reg-format" maxlength="3" placeholder="Location (IATA)" value="${location}">
-                <input type="date" class="sighting-date" value="${date}">
+                <input type="date" class="sighting-date" value="${sightingDate}">
                 <div class="history-actions">
                     <button type="button" class="button delete remove-sighting-btn">×</button>
                 </div>
@@ -1947,15 +2017,12 @@
                 this.value = this.value.toUpperCase();
             });
             sightingItem.querySelector('.remove-sighting-btn').addEventListener('click', () => {
-                if (document.querySelectorAll('#sightingsContainer .history-item').length > 1 || !isFirst) {
-                    sightingItem.remove();
-                } else {
-                    alert("You must have at least one sighting.");
-                }
+                sightingItem.remove();
             });
         }
         function resetSightingItems() {
             sightingsContainer.innerHTML = '';
+            syncSightingsSection();
         }
         
         function getStatus(aircraft) {
@@ -2032,6 +2099,90 @@
                 ? currentOperator.replace(/\s+/g, '-')
                 : '';
             return { currentReg, currentOperator, seenItems, operatorUrlPart };
+        }
+
+        function normalizeRegistrationKey(reg) {
+            return (reg || '').trim().toUpperCase().replace(/-/g, '');
+        }
+
+        function lookupExistingLogEntry(regKey, excludeAircraftIndex) {
+            if (!regKey) return null;
+            for (let i = 0; i < aircraftData.length; i++) {
+                if (i === excludeAircraftIndex) continue;
+                const ac = aircraftData[i];
+                const keys = new Set();
+                const add = (r) => {
+                    const trimmed = (r || '').trim();
+                    if (trimmed) keys.add(normalizeRegistrationKey(trimmed));
+                };
+                add(ac.registration);
+                (ac.history || []).forEach(item => add(item.registration));
+                if (!keys.has(regKey)) continue;
+                const display = getAircraftDisplayInfo(ac);
+                return {
+                    index: i,
+                    currentReg: display.currentReg,
+                    operator: display.currentOperator
+                };
+            }
+            return null;
+        }
+
+        function findDuplicateRegistrationsInForm(formRoot, excludeAircraftIndex) {
+            const historyContainer = formRoot
+                ? formRoot.querySelector('#historyItemsContainer_random')
+                : historyItemsContainer;
+            if (!historyContainer) return [];
+            const dupes = [];
+            const seenKeys = new Set();
+            historyContainer.querySelectorAll('.history-reg').forEach(input => {
+                const raw = input.value.trim();
+                if (raw.length < 3) return;
+                const key = normalizeRegistrationKey(raw);
+                if (seenKeys.has(key)) return;
+                seenKeys.add(key);
+                const existing = lookupExistingLogEntry(key, excludeAircraftIndex);
+                if (existing) {
+                    dupes.push({
+                        displayReg: raw.toUpperCase(),
+                        existingReg: existing.currentReg,
+                        operator: existing.operator
+                    });
+                }
+            });
+            return dupes;
+        }
+
+        function alertDuplicateRegistrationOnBlur(regInput, excludeAircraftIndex) {
+            const raw = regInput.value.trim();
+            if (raw.length < 3) return;
+            const existing = lookupExistingLogEntry(normalizeRegistrationKey(raw), excludeAircraftIndex);
+            if (!existing) return;
+            alert(
+                `${raw.toUpperCase()} is already in your log (${existing.currentReg}, ${existing.operator || 'Unknown'}). You can still save if you confirm when submitting.`
+            );
+        }
+
+        function confirmDuplicateRegistrationsOverride(dupes) {
+            if (!dupes.length) return true;
+            const lines = dupes.map(d =>
+                `${d.displayReg} — logged as ${d.existingReg} (${d.operator || 'Unknown'})`
+            ).join('\n');
+            return confirm(`These registrations are already in your log:\n\n${lines}\n\nSave anyway?`);
+        }
+
+        function attachRegistrationDuplicateCheck(regInput, formRoot) {
+            regInput.addEventListener('blur', function() {
+                let excludeIndex = -1;
+                if (formRoot?.dataset?.aircraftDataIndex != null) {
+                    const idx = parseInt(formRoot.dataset.aircraftDataIndex, 10);
+                    if (!Number.isNaN(idx) && idx >= 0) excludeIndex = idx;
+                } else {
+                    const editIndex = parseInt(editIndexInput.value, 10);
+                    if (editIndex >= 0) excludeIndex = editIndex;
+                }
+                alertDuplicateRegistrationOnBlur(this, excludeIndex);
+            });
         }
 
         function buildAircraftSummaryHtml(aircraft, display) {
@@ -2528,6 +2679,12 @@
                 return;
             }
 
+            const editIndexForDupes = parseInt(editIndexInput.value, 10);
+            const duplicateRegs = findDuplicateRegistrationsInForm(null, editIndexForDupes >= 0 ? editIndexForDupes : -1);
+            if (!confirmDuplicateRegistrationsOverride(duplicateRegs)) {
+                return;
+            }
+
             let status = null;
             let statusNotes = null;
             if (!inServiceCheckbox.checked) {
@@ -2851,9 +3008,8 @@
                 aircraft.sightings.forEach((sighting, i) => {
                     addSightingItem(sighting.location, sighting.date, i === 0);
                 });
-            } else {
-                addSightingItem('', '', true);
             }
+            syncSightingsSection();
             // Fill flight details if flown
             flownCheckbox.checked = aircraft.flown;
             toggleFlightDetails();
@@ -3023,6 +3179,9 @@
         function fillRandomReviewForm(index, wrapper, eligibleAircraftOverride) {
             const eligibleAircraft = eligibleAircraftOverride || window._randomReviewEligibleAircraft;
             const aircraft = eligibleAircraft[index];
+            const sourceRef = eligibleAircraft ? eligibleAircraft[index] : null;
+            const dataIndex = sourceRef != null ? aircraftData.indexOf(sourceRef) : -1;
+            wrapper.dataset.aircraftDataIndex = String(dataIndex >= 0 ? dataIndex : index);
             const typeEl = wrapper.querySelector('#aircraftType_random');
             if (typeEl) typeEl.value = aircraft.type || '';
             wrapper.querySelector('#inService_random').checked = aircraft.inService;
@@ -3099,9 +3258,8 @@
                 aircraft.sightings.forEach((sighting, i) => {
                     addSightingItemRandom(sighting.location, sighting.date, i === 0, wrapper);
                 });
-            } else {
-                addSightingItemRandom('', '', true, wrapper);
             }
+            syncSightingsSection(wrapper);
             // Flown
             wrapper.querySelector('#flown_random').checked = aircraft.flown;
             // Show/hide flight details
@@ -3110,6 +3268,14 @@
         }
         // Save the random review form data back to aircraftData
         function saveRandomReviewForm(index, wrapper, eligibleAircraftOverride) {
+            const excludeIndex = parseInt(wrapper.dataset.aircraftDataIndex, 10);
+            const duplicateRegs = findDuplicateRegistrationsInForm(
+                wrapper,
+                !Number.isNaN(excludeIndex) && excludeIndex >= 0 ? excludeIndex : -1
+            );
+            if (!confirmDuplicateRegistrationsOverride(duplicateRegs)) {
+                return;
+            }
             // Similar to handleFormSubmit, but for the random form
             const historyItems = [];
             let currentReg = '';
@@ -3225,11 +3391,13 @@
                 <input type="checkbox" class="seen-checkbox hidden" ${isSeen ? 'checked' : ''}>
             `;
             historyItemsContainer.appendChild(historyItem);
-            historyItem.querySelector('.history-reg').addEventListener('input', function() {
+            const regInputElRandom = historyItem.querySelector('.history-reg');
+            regInputElRandom.addEventListener('input', function() {
                 this.value = this.value.toUpperCase();
                 clearLookupUndo(historyItem);
                 hideRowLookupMatch(historyItem);
             });
+            attachRegistrationDuplicateCheck(regInputElRandom, wrapper);
             const lookupContext = createRandomReviewLookupContext(wrapper);
             attachRowLookupMatchPicker(historyItem, lookupContext);
             historyItem.querySelector('.lookup-reg-btn').addEventListener('click', (e) => {
@@ -3260,6 +3428,11 @@
                 });
                 this.textContent = `✓ ${buttonText}`;
                 this.style.backgroundColor = '#34c759';
+
+                const regInput = historyItem.querySelector('.history-reg');
+                if (regInput && regInput.value.trim().length >= 3) {
+                    runRegistrationLookup(regInput, historyItem, lookupContext);
+                }
             });
             historyItem.querySelector('.set-seen-btn').addEventListener('click', function() {
                 const seenCheckbox = historyItem.querySelector('.seen-checkbox');
@@ -3267,9 +3440,11 @@
                 if (seenCheckbox.checked) {
                     this.style.backgroundColor = '#5ac8fa';
                     this.textContent = '✓ Seen';
+                    syncSightingsSection(wrapper, true);
                 } else {
                     this.style.backgroundColor = '#5ac8fa';
                     this.textContent = 'Seen';
+                    syncSightingsSection(wrapper);
                 }
             });
             if (isCurrent) {
@@ -3307,12 +3482,13 @@
             });
         }
         function addSightingItemRandom(location, date, isFirst, wrapper) {
+            const sightingDate = date || todayDateInputValue();
             const sightingsContainer = wrapper.querySelector('#sightingsContainer_random');
             const sightingItem = document.createElement('div');
             sightingItem.className = 'history-item';
             sightingItem.innerHTML = `
                 <input type="text" class="sighting-location reg-format" maxlength="3" placeholder="Location (IATA)" value="${location}">
-                <input type="date" class="sighting-date" value="${date}">
+                <input type="date" class="sighting-date" value="${sightingDate}">
                 <div class="history-actions">
                     <button type="button" class="button delete remove-sighting-btn">×</button>
                 </div>
@@ -3322,11 +3498,7 @@
                 this.value = this.value.toUpperCase();
             });
             sightingItem.querySelector('.remove-sighting-btn').addEventListener('click', () => {
-                if (wrapper.querySelectorAll('#sightingsContainer_random .history-item').length > 1 || !isFirst) {
-                    sightingItem.remove();
-                } else {
-                    alert("You must have at least one sighting.");
-                }
+                sightingItem.remove();
             });
         }
         
@@ -3387,7 +3559,7 @@
             const historyItemsContainer = wrapper.querySelector('#historyItemsContainer_random');
             if (addHistoryBtn && historyItemsContainer) {
                 addHistoryBtn.addEventListener('click', function() {
-                    addHistoryItemRandom('', '', false, true, wrapper);
+                    addHistoryItemRandom('', '', false, false, wrapper);
                 });
             }
             const lookupCtx = createRandomReviewLookupContext(wrapper);
@@ -3408,7 +3580,7 @@
             const sightingsContainer = wrapper.querySelector('#sightingsContainer_random');
             if (addSightingBtn && sightingsContainer) {
                 addSightingBtn.addEventListener('click', function() {
-                    addSightingItemRandom('', '', false, true);
+                    addSightingItemRandom('', '', false, wrapper);
                 });
             }
             // Uppercase formatting for relevant inputs
