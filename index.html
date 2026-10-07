@@ -135,6 +135,19 @@
             font-size: 0.9375rem;
         }
 
+        .search-scope-group {
+            display: inline-flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.35rem 0.75rem;
+        }
+
+        .search-scope-group .search-scope-title {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
         .button {
             display: inline-block;
             padding: 0.5rem 1rem;
@@ -1118,7 +1131,13 @@
             <button class="button inactive" id="viewInactiveFromListBtn">Inactive</button>
         </div>
         <div class="filter-bar">
-            <input type="text" id="registrationSearch" class="search-input" placeholder="Search by registration…" />
+            <input type="text" id="registrationSearch" class="search-input" placeholder="Search registration or airline…" aria-label="Search registration or airline" />
+            <div class="search-scope-group" role="radiogroup" aria-label="Search scope">
+                <span class="search-scope-title">Search in</span>
+                <label><input type="radio" name="logSearchScope" value="current"> Current</label>
+                <label><input type="radio" name="logSearchScope" value="historic"> Historic</label>
+                <label><input type="radio" name="logSearchScope" value="all" checked> All</label>
+            </div>
             <label for="sortFilter">Sort by</label>
             <select id="sortFilter">
                 <option value="registration">Registration (A–Z)</option>
@@ -1155,6 +1174,7 @@
         <div id="randomReviewFormContainer"></div>
         <div class="button-container">
             <button class="button" id="nextRandomBtn">Next Random Aircraft</button>
+            <button class="button secondary" id="openAircraftPageBtn">View on Planespotters</button>
             <button class="button secondary" id="exitRandomBtn">Exit Review</button>
         </div>
     </div>
@@ -1218,6 +1238,7 @@
         const randomReviewPage = document.getElementById('randomReviewPage');
         const randomReviewFormContainer = document.getElementById('randomReviewFormContainer');
         const nextRandomBtn = document.getElementById('nextRandomBtn');
+        const openAircraftPageBtn = document.getElementById('openAircraftPageBtn');
         const exitRandomBtn = document.getElementById('exitRandomBtn');
         const landingTabLog = document.getElementById('landingTabLog');
         const landingTabTools = document.getElementById('landingTabTools');
@@ -1284,6 +1305,7 @@
             addNewFromListBtn.addEventListener('click', showLogForm);
             if (randomReviewBtn) randomReviewBtn.addEventListener('click', startRandomReview);
             if (nextRandomBtn) nextRandomBtn.addEventListener('click', showNextRandomAircraft);
+            if (openAircraftPageBtn) openAircraftPageBtn.addEventListener('click', openPlanespottersFromReview);
             if (exitRandomBtn) exitRandomBtn.addEventListener('click', exitRandomReview);
             
             inServiceCheckbox.addEventListener('change', toggleOutOfServiceSection);
@@ -1345,6 +1367,9 @@
             // Registration search event
             const registrationSearch = document.getElementById('registrationSearch');
             if (registrationSearch) registrationSearch.addEventListener('input', displayAircraftList);
+            document.querySelectorAll('input[name="logSearchScope"]').forEach(el => {
+                el.addEventListener('change', displayAircraftList);
+            });
             // Inactive registration search event
             const inactiveRegistrationSearch = document.getElementById('inactiveRegistrationSearch');
             if (inactiveRegistrationSearch) inactiveRegistrationSearch.addEventListener('input', displayInactiveAircraftList);
@@ -2544,6 +2569,55 @@
             showLandingPage();
         }
 
+        function logSearchMatchesFields(searchVal, registration, operator) {
+            const reg = (registration || '').toLowerCase();
+            const op = (operator || '').toLowerCase();
+            return reg.includes(searchVal) || op.includes(searchVal);
+        }
+
+        /** Registrations and operators that are not the aircraft's current pair. */
+        function getHistoricLogSearchValues(aircraft) {
+            const { currentReg, currentOperator } = getAircraftDisplayInfo(aircraft);
+            const curReg = (currentReg || '').trim().toLowerCase();
+            const curOp = (currentOperator || '').trim().toLowerCase();
+            const values = new Set();
+
+            const addReg = (reg) => {
+                const r = (reg || '').trim();
+                if (!r) return;
+                const lower = r.toLowerCase();
+                if (lower !== curReg) values.add(lower);
+            };
+            const addOp = (op) => {
+                const o = (op || '').trim();
+                if (!o) return;
+                const lower = o.toLowerCase();
+                if (lower !== curOp) values.add(lower);
+            };
+
+            if (Array.isArray(aircraft.history)) {
+                aircraft.history.forEach(item => {
+                    if (item.isCurrent) return;
+                    addReg(item.registration);
+                    addOp(item.operator);
+                });
+            }
+            addReg(aircraft.registration);
+            addOp(aircraft.airline);
+
+            return values;
+        }
+
+        function aircraftMatchesLogSearch(aircraft, searchVal, scope) {
+            const { currentReg, currentOperator } = getAircraftDisplayInfo(aircraft);
+            const matchesCurrent = logSearchMatchesFields(searchVal, currentReg, currentOperator);
+            const matchesHistoric = [...getHistoricLogSearchValues(aircraft)].some(v => v.includes(searchVal));
+
+            if (scope === 'current') return matchesCurrent;
+            if (scope === 'historic') return matchesHistoric;
+            return matchesCurrent || matchesHistoric;
+        }
+
         function displayAircraftList() {
             aircraftEntries.innerHTML = '';
             let activeAircraft = aircraftData.filter(aircraft => aircraft.inService);
@@ -2554,13 +2628,11 @@
             const registrationSearch = document.getElementById('registrationSearch');
             if (registrationSearch && registrationSearch.value.trim() !== '') {
                 const searchVal = registrationSearch.value.trim().toLowerCase();
-                activeAircraft = activeAircraft.filter(aircraft => {
-                    if ((aircraft.registration || '').toLowerCase().includes(searchVal)) return true;
-                    if (Array.isArray(aircraft.history)) {
-                        return aircraft.history.some(item => (item.registration || '').toLowerCase().includes(searchVal));
-                    }
-                    return false;
-                });
+                const scopeEl = document.querySelector('input[name="logSearchScope"]:checked');
+                const scope = scopeEl ? scopeEl.value : 'all';
+                activeAircraft = activeAircraft.filter(aircraft =>
+                    aircraftMatchesLogSearch(aircraft, searchVal, scope)
+                );
             }
             const sortBy = sortFilter.value;
             if (sortBy === 'airline') {
@@ -2854,6 +2926,32 @@
             // Render the edit form for this aircraft inside randomReviewFormContainer
             renderEditFormInContainer(idx, randomReviewFormContainer, eligibleAircraft);
         }
+        function getCurrentRegFromReviewForm() {
+            const wrapper = randomReviewFormContainer.firstElementChild;
+            if (wrapper) {
+                let currentReg = '';
+                wrapper.querySelectorAll('#historyItemsContainer_random .history-reg-row').forEach(item => {
+                    if (item.querySelector('.current-reg-checkbox')?.checked) {
+                        currentReg = item.querySelector('.history-reg')?.value || '';
+                    }
+                });
+                if (currentReg.trim()) return currentReg.trim();
+            }
+            const eligibleAircraft = window._randomReviewEligibleAircraft;
+            const idx = randomReviewOrder[randomReviewIndex];
+            if (eligibleAircraft && idx !== undefined) {
+                return getAircraftDisplayInfo(eligibleAircraft[idx]).currentReg || '';
+            }
+            return '';
+        }
+        function openPlanespottersFromReview() {
+            const reg = getCurrentRegFromReviewForm();
+            if (!reg) {
+                alert('No registration to look up.');
+                return;
+            }
+            window.open(planespottersRegUrl(reg), '_blank', 'noopener,noreferrer');
+        }
         function showNextRandomAircraft() {
             // Save any edits before moving on
             const form = randomReviewFormContainer.querySelector('form');
@@ -3067,7 +3165,14 @@
                 sightings: sightings,
                 loggedDate: new Date().toISOString()
             };
-            aircraftData[index] = aircraft;
+            const eligible = eligibleAircraftOverride || window._randomReviewEligibleAircraft;
+            const sourceRef = eligible ? eligible[index] : null;
+            const dataIndex = sourceRef != null ? aircraftData.indexOf(sourceRef) : -1;
+            const targetIndex = dataIndex >= 0 ? dataIndex : index;
+            aircraftData[targetIndex] = aircraft;
+            if (eligible && eligible[index] !== undefined) {
+                eligible[index] = aircraft;
+            }
             saveAircraftData();
         }
         // Helper functions for random review form (addHistoryItem, addTripItem, addSightingItem)
