@@ -4330,7 +4330,15 @@
         }
         
         function exportData() {
-            const dataStr = JSON.stringify(aircraftData, null, 2);
+            const payload = {
+                version: 2,
+                exportedAt: new Date().toISOString(),
+                aircraft: aircraftData,
+                fleets: fleetData,
+                fleetViewOverrides: fleetViewOverrides,
+                seenNotLogged: seenNotLogged
+            };
+            const dataStr = JSON.stringify(payload, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -4341,6 +4349,47 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
+
+        function applyImportedData(importedData) {
+            // Legacy export: bare aircraft array
+            if (Array.isArray(importedData)) {
+                aircraftData = importedData;
+                saveAircraftData();
+                return { aircraftCount: aircraftData.length, fleetsImported: false };
+            }
+
+            if (!importedData || typeof importedData !== 'object') {
+                throw new Error('Invalid data format');
+            }
+
+            const aircraft = Array.isArray(importedData.aircraft)
+                ? importedData.aircraft
+                : (Array.isArray(importedData.aircraftData) ? importedData.aircraftData : null);
+            if (!aircraft) throw new Error('Invalid data format: missing aircraft list');
+
+            aircraftData = aircraft;
+            saveAircraftData();
+
+            let fleetsImported = false;
+            if (importedData.fleets && typeof importedData.fleets === 'object' && !Array.isArray(importedData.fleets)) {
+                fleetData = importedData.fleets;
+                saveFleetData();
+                fleetsImported = true;
+            }
+            if (importedData.fleetViewOverrides && typeof importedData.fleetViewOverrides === 'object' && !Array.isArray(importedData.fleetViewOverrides)) {
+                fleetViewOverrides = importedData.fleetViewOverrides;
+                saveFleetViewOverrides();
+                fleetsImported = true;
+            }
+            if (Array.isArray(importedData.seenNotLogged)) {
+                seenNotLogged = importedData.seenNotLogged;
+                saveSeenNotLogged();
+                fleetsImported = true;
+            }
+
+            return { aircraftCount: aircraftData.length, fleetsImported };
+        }
+
         function handleImportFile(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -4348,10 +4397,11 @@
             reader.onload = function(event) {
                 try {
                     const importedData = JSON.parse(event.target.result);
-                    if (!Array.isArray(importedData)) throw new Error('Invalid data format');
-                    aircraftData = importedData;
-                    saveAircraftData();
-                    alert('Data imported successfully!');
+                    const result = applyImportedData(importedData);
+                    const fleetNote = result.fleetsImported
+                        ? ' Fleet data imported too.'
+                        : ' (No fleet data in file — existing fleet lists kept.)';
+                    alert(`Data imported successfully! ${result.aircraftCount} aircraft.${fleetNote}`);
                     showLandingPage();
                 } catch (err) {
                     alert('Failed to import data: ' + err.message);
