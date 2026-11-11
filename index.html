@@ -873,10 +873,19 @@
             border-radius: var(--radius-lg);
             padding: 2rem 1.5rem 1.5rem;
             margin: 2.5rem auto 0;
-            display: flex;
             flex-direction: column;
             align-items: stretch;
             max-width: 380px;
+        }
+
+        /* ID display must not beat .hidden / [hidden] when leaving the home screen */
+        #landingPage:not(.hidden):not([hidden]) {
+            display: flex;
+        }
+
+        #landingPage.hidden,
+        #landingPage[hidden] {
+            display: none !important;
         }
 
         #landingPage .app-badge {
@@ -947,7 +956,18 @@
 
         .landing-tab-panel.hidden,
         .landing-tab-panel[hidden] {
-            display: none;
+            display: none !important;
+        }
+
+        #logForm.hidden,
+        #logForm[hidden],
+        #aircraftList.hidden,
+        #aircraftList[hidden],
+        #inactiveAircraftList.hidden,
+        #inactiveAircraftList[hidden],
+        #randomReviewPage.hidden,
+        #randomReviewPage[hidden] {
+            display: none !important;
         }
 
         .landing-panel-intro {
@@ -956,6 +976,286 @@
             color: var(--text-secondary);
             line-height: 1.55;
             text-align: center;
+        }
+
+        .fleet-panel-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+            margin-bottom: 0.85rem;
+        }
+
+        .fleet-panel-controls label {
+            margin-bottom: 0.25rem;
+        }
+
+        .fleet-panel-controls select,
+        .fleet-panel-controls .search-input {
+            margin-bottom: 0;
+        }
+
+        .fleet-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem 0.75rem;
+        }
+
+        .fleet-toolbar .button {
+            width: auto;
+            margin: 0;
+        }
+
+        .fleet-summary {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .fleet-subtabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .fleet-subtab {
+            flex: 1;
+            padding: 0.5rem 0.4rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            border-radius: 0;
+            cursor: pointer;
+        }
+
+        .fleet-subtab:hover {
+            color: var(--text);
+        }
+
+        .fleet-subtab.is-active {
+            color: var(--text);
+            border-bottom-color: var(--text);
+        }
+
+        .fleet-subtab:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .fleet-edit-panel {
+            margin-bottom: 0.85rem;
+            padding: 0.85rem 0.75rem;
+            background: var(--surface-muted);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+        }
+
+        .fleet-edit-panel textarea {
+            margin-bottom: 0.65rem;
+            min-height: 96px;
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+        }
+
+        .fleet-edit-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .fleet-edit-actions .button {
+            width: auto;
+            margin: 0;
+        }
+
+        .fleet-edit-hint {
+            margin: 0.65rem 0 0;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        .fleet-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.65rem 0.15rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .fleet-row:last-child {
+            border-bottom: none;
+        }
+
+        .fleet-row-check {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            margin: 0;
+        }
+
+        .fleet-row-check input {
+            width: 1.2rem;
+            height: 1.2rem;
+            margin: 0;
+            padding: 0;
+            accent-color: var(--primary);
+            pointer-events: none;
+        }
+
+        .fleet-row-reg {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .fleet-reg {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            font-size: 0.9375rem;
+            color: var(--link);
+            text-decoration: none;
+            overflow-wrap: anywhere;
+        }
+
+        .fleet-reg:hover {
+            text-decoration: underline;
+        }
+
+        .fleet-row-actions {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+        }
+
+        .fleet-row-actions:empty {
+            display: none;
+        }
+
+        .fleet-row-actions .button {
+            width: auto;
+            padding: 0.3rem 0.55rem;
+            font-size: 0.75rem;
+            margin: 0;
+        }
+
+        .fleet-historic-toggle {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin: 0;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .fleet-historic-toggle input {
+            width: 1rem;
+            height: 1rem;
+            margin: 0;
+            padding: 0;
+            accent-color: var(--warning);
+        }
+
+        .button.mark-seen {
+            background-color: var(--surface);
+            color: var(--text-secondary);
+            border-color: var(--border-strong);
+            font-weight: 600;
+        }
+
+        .button.mark-seen:hover {
+            background-color: var(--surface-muted);
+            color: var(--text);
+        }
+
+        .button.mark-seen.is-marked {
+            background-color: #2f6f4e;
+            border-color: #2f6f4e;
+            color: #f4faf6;
+        }
+
+        .button.mark-seen.is-marked:hover {
+            background-color: #265a40;
+            border-color: #265a40;
+            color: #f4faf6;
+        }
+
+        .fleet-empty {
+            margin: 0.75rem 0 0;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .tools-seen-section {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .tools-seen-section h3 {
+            margin: 0 0 0.35rem;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .tools-seen-intro {
+            margin: 0 0 0.75rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        .seen-pending-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem 0.75rem;
+            flex-wrap: wrap;
+            padding: 0.55rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .seen-pending-row:last-child {
+            border-bottom: none;
+        }
+
+        .seen-pending-info {
+            flex: 1 1 8rem;
+            min-width: 0;
+        }
+
+        .seen-pending-reg {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .seen-pending-meta {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .seen-pending-actions {
+            display: flex;
+            gap: 0.4rem;
+            flex: 0 0 auto;
+        }
+
+        .seen-pending-actions .button {
+            width: auto;
+            padding: 0.3rem 0.55rem;
+            font-size: 0.75rem;
+            margin: 0;
         }
 
         .landing-actions,
@@ -1043,6 +1343,7 @@
         <h1>Aircraft Logger</h1>
         <div class="landing-tabs" role="tablist" aria-label="Home sections">
             <button type="button" class="landing-tab is-active" role="tab" id="landingTabLog" aria-selected="true" aria-controls="landingPanelLog">My log</button>
+            <button type="button" class="landing-tab" role="tab" id="landingTabFleets" aria-selected="false" aria-controls="landingPanelFleets" tabindex="-1">Fleets</button>
             <button type="button" class="landing-tab" role="tab" id="landingTabTools" aria-selected="false" aria-controls="landingPanelTools" tabindex="-1">Tools</button>
         </div>
         <div id="landingPanelLog" class="landing-tab-panel" role="tabpanel" aria-labelledby="landingTabLog">
@@ -1052,12 +1353,50 @@
                 <button class="button secondary" id="viewInactiveBtn">View Inactive Aircraft</button>
             </div>
         </div>
+        <div id="landingPanelFleets" class="landing-tab-panel hidden" role="tabpanel" aria-labelledby="landingTabFleets" hidden>
+            <div class="fleet-panel-controls">
+                <div>
+                    <label for="fleetAirlineSelect">Airline</label>
+                    <select id="fleetAirlineSelect" aria-label="Select airline">
+                        <option value="">Select an airline…</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="fleetRegSearch">Search registrations</label>
+                    <input type="text" id="fleetRegSearch" class="search-input" placeholder="Filter by registration…" aria-label="Search fleet registrations" disabled />
+                </div>
+                <div class="fleet-toolbar">
+                    <button type="button" class="button secondary" id="fleetEditBtn" disabled>Update fleet</button>
+                    <span id="fleetSummary" class="fleet-summary" aria-live="polite"></span>
+                </div>
+            </div>
+            <div class="fleet-subtabs" role="tablist" aria-label="Fleet period">
+                <button type="button" class="fleet-subtab is-active" role="tab" id="fleetSubtabActive" aria-selected="true" data-fleet-view="active" disabled>Active</button>
+                <button type="button" class="fleet-subtab" role="tab" id="fleetSubtabHistoric" aria-selected="false" data-fleet-view="historic" tabindex="-1" disabled>Historic</button>
+            </div>
+            <div id="fleetList"></div>
+            <div id="fleetEditPanel" class="fleet-edit-panel hidden">
+                <label for="fleetAddRegs">Add registrations</label>
+                <textarea id="fleetAddRegs" placeholder="One registration per line" aria-label="Registrations to add"></textarea>
+                <div class="fleet-edit-actions">
+                    <button type="button" class="button" id="fleetAddRegsBtn">Add to list</button>
+                    <button type="button" class="button secondary" id="fleetDoneEditBtn">Done</button>
+                </div>
+                <p class="fleet-edit-hint">Adds registrations to the current tab (Active or Historic). Use this for aircraft you have not seen yet.</p>
+                <div id="fleetUpdateManualList"></div>
+            </div>
+        </div>
         <div id="landingPanelTools" class="landing-tab-panel hidden" role="tabpanel" aria-labelledby="landingTabTools" hidden>
             <div class="landing-utilities">
                 <button class="button tertiary export" id="exportBtn">Export Data</button>
                 <button class="button tertiary import" id="importBtn">Import Data</button>
                 <input type="file" id="importFileInput" accept="application/json" style="display:none;" />
                 <button class="button random-review" id="randomReviewBtn">Random Review</button>
+            </div>
+            <div class="tools-seen-section">
+                <h3>Seen but not logged</h3>
+                <p class="tools-seen-intro">Registrations marked on Fleets that are not in your log yet. Log them here when ready.</p>
+                <div id="seenNotLoggedList"></div>
             </div>
         </div>
     </div>
@@ -1264,16 +1603,39 @@
         const openAircraftPageBtn = document.getElementById('openAircraftPageBtn');
         const exitRandomBtn = document.getElementById('exitRandomBtn');
         const landingTabLog = document.getElementById('landingTabLog');
+        const landingTabFleets = document.getElementById('landingTabFleets');
         const landingTabTools = document.getElementById('landingTabTools');
         const landingPanelLog = document.getElementById('landingPanelLog');
+        const landingPanelFleets = document.getElementById('landingPanelFleets');
         const landingPanelTools = document.getElementById('landingPanelTools');
+        const fleetAirlineSelect = document.getElementById('fleetAirlineSelect');
+        const fleetEditBtn = document.getElementById('fleetEditBtn');
+        const fleetSummary = document.getElementById('fleetSummary');
+        const fleetEditPanel = document.getElementById('fleetEditPanel');
+        const fleetUpdateManualList = document.getElementById('fleetUpdateManualList');
+        const fleetAddRegs = document.getElementById('fleetAddRegs');
+        const fleetAddRegsBtn = document.getElementById('fleetAddRegsBtn');
+        const fleetDoneEditBtn = document.getElementById('fleetDoneEditBtn');
+        const fleetSubtabActive = document.getElementById('fleetSubtabActive');
+        const fleetSubtabHistoric = document.getElementById('fleetSubtabHistoric');
+        const fleetRegSearch = document.getElementById('fleetRegSearch');
+        const fleetList = document.getElementById('fleetList');
+        const seenNotLoggedList = document.getElementById('seenNotLoggedList');
         
         // ========== DATA STORAGE ==========
         let aircraftData = [];
+        let fleetData = {};
+        let fleetViewOverrides = {}; // { airline: { REGKEY: 'active'|'historic' } }
+        let seenNotLogged = []; // [{ registration, airline, view, markedAt }]
+        let fleetEditMode = false;
+        let fleetView = 'active'; // 'active' | 'historic'
         
         // ========== INITIALIZATION FUNCTIONS ==========
         function init() {
             loadAircraftData();
+            loadFleetData();
+            loadFleetViewOverrides();
+            loadSeenNotLogged();
             setupEventListeners();
             setLandingTab('log');
             addHistoryItem('', '', true);
@@ -1296,33 +1658,143 @@
         function saveAircraftData() {
             localStorage.setItem('aircraftData', JSON.stringify(aircraftData));
         }
+
+        function loadFleetData() {
+            const saved = localStorage.getItem('fleetData');
+            if (!saved) {
+                fleetData = {};
+                return;
+            }
+            try {
+                const parsed = JSON.parse(saved);
+                fleetData = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+            } catch (e) {
+                console.error('Error parsing fleet data:', e);
+                fleetData = {};
+            }
+        }
+
+        function saveFleetData() {
+            localStorage.setItem('fleetData', JSON.stringify(fleetData));
+        }
+
+        function loadFleetViewOverrides() {
+            const saved = localStorage.getItem('fleetViewOverrides');
+            if (!saved) {
+                fleetViewOverrides = {};
+                return;
+            }
+            try {
+                const parsed = JSON.parse(saved);
+                fleetViewOverrides = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+            } catch (e) {
+                console.error('Error parsing fleet view overrides:', e);
+                fleetViewOverrides = {};
+            }
+        }
+
+        function saveFleetViewOverrides() {
+            localStorage.setItem('fleetViewOverrides', JSON.stringify(fleetViewOverrides));
+        }
+
+        function loadSeenNotLogged() {
+            const saved = localStorage.getItem('seenNotLogged');
+            if (!saved) {
+                seenNotLogged = [];
+                return;
+            }
+            try {
+                const parsed = JSON.parse(saved);
+                seenNotLogged = Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+                console.error('Error parsing seen-not-logged data:', e);
+                seenNotLogged = [];
+            }
+        }
+
+        function saveSeenNotLogged() {
+            localStorage.setItem('seenNotLogged', JSON.stringify(seenNotLogged));
+        }
         
         // ========== EVENT LISTENERS SETUP ==========
         function setLandingTab(tab) {
-            const showLog = tab !== 'tools';
-            if (landingTabLog && landingTabTools && landingPanelLog && landingPanelTools) {
-                landingTabLog.classList.toggle('is-active', showLog);
-                landingTabTools.classList.toggle('is-active', !showLog);
-                landingTabLog.setAttribute('aria-selected', showLog ? 'true' : 'false');
-                landingTabTools.setAttribute('aria-selected', showLog ? 'false' : 'true');
-                landingTabLog.tabIndex = showLog ? 0 : -1;
-                landingTabTools.tabIndex = showLog ? -1 : 0;
-                landingPanelLog.classList.toggle('hidden', !showLog);
-                landingPanelTools.classList.toggle('hidden', showLog);
-                landingPanelLog.hidden = !showLog;
-                landingPanelTools.hidden = showLog;
+            const activeTab = tab === 'fleets' || tab === 'tools' ? tab : 'log';
+
+            // Home tabs should only show the landing card — never leave edit/list views open under it
+            logForm.classList.add('hidden');
+            logForm.hidden = true;
+            aircraftList.classList.add('hidden');
+            aircraftList.hidden = true;
+            inactiveAircraftList.classList.add('hidden');
+            inactiveAircraftList.hidden = true;
+            randomReviewPage.classList.add('hidden');
+            randomReviewPage.hidden = true;
+            landingPage.classList.remove('hidden');
+            landingPage.hidden = false;
+
+            const tabs = [
+                { id: 'log', btn: landingTabLog, panel: landingPanelLog },
+                { id: 'fleets', btn: landingTabFleets, panel: landingPanelFleets },
+                { id: 'tools', btn: landingTabTools, panel: landingPanelTools }
+            ];
+            tabs.forEach(({ id, btn, panel }) => {
+                if (!btn || !panel) return;
+                const isActive = id === activeTab;
+                btn.classList.toggle('is-active', isActive);
+                btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                btn.tabIndex = isActive ? 0 : -1;
+                panel.classList.toggle('hidden', !isActive);
+                panel.hidden = !isActive;
+            });
+            if (activeTab === 'fleets') {
+                populateFleetAirlineSelect();
+                renderFleetList();
+            } else {
+                setFleetEditMode(false);
+            }
+            if (activeTab === 'tools') {
+                renderSeenNotLoggedList();
             }
         }
 
         function setupEventListeners() {
             if (landingTabLog) landingTabLog.addEventListener('click', () => setLandingTab('log'));
+            if (landingTabFleets) landingTabFleets.addEventListener('click', () => setLandingTab('fleets'));
             if (landingTabTools) landingTabTools.addEventListener('click', () => setLandingTab('tools'));
+            if (fleetAirlineSelect) {
+                fleetAirlineSelect.addEventListener('change', () => {
+                    setFleetEditMode(false);
+                    if (fleetRegSearch) fleetRegSearch.value = '';
+                    renderFleetList();
+                });
+            }
+            if (fleetRegSearch) {
+                fleetRegSearch.addEventListener('input', () => renderFleetList());
+            }
+            if (fleetSubtabActive) {
+                fleetSubtabActive.addEventListener('click', () => setFleetView('active'));
+            }
+            if (fleetSubtabHistoric) {
+                fleetSubtabHistoric.addEventListener('click', () => setFleetView('historic'));
+            }
+            if (fleetEditBtn) fleetEditBtn.addEventListener('click', () => setFleetEditMode(!fleetEditMode));
+            if (fleetDoneEditBtn) fleetDoneEditBtn.addEventListener('click', () => setFleetEditMode(false));
+            if (fleetAddRegsBtn) fleetAddRegsBtn.addEventListener('click', addFleetRegistrationsFromInput);
             logAircraftBtn.addEventListener('click', showLogForm);
             viewLogsBtn.addEventListener('click', showAircraftList);
             viewInactiveBtn.addEventListener('click', showInactiveAircraftList);
             viewInactiveFromListBtn.addEventListener('click', showInactiveAircraftList);
             backFromInactiveBtn.addEventListener('click', showLandingPage);
-            cancelBtn.addEventListener('click', showLandingPage);
+            cancelBtn.addEventListener('click', () => {
+                const backToTools = !!window._returnToToolsAfterEdit;
+                const backToFleets = !!window._returnToFleetsAfterEdit;
+                window._returnToToolsAfterEdit = false;
+                window._returnToFleetsAfterEdit = false;
+                window._pendingSeenNotLogged = null;
+                if (backToTools) showLandingPage('tools');
+                else if (backToFleets) showLandingPage('fleets');
+                else showLandingPage('log');
+            });
             backToHomeBtn.addEventListener('click', showLandingPage);
             addNewFromListBtn.addEventListener('click', showLogForm);
             if (randomReviewBtn) randomReviewBtn.addEventListener('click', startRandomReview);
@@ -1398,23 +1870,823 @@
         }
         
         // ========== PAGE NAVIGATION FUNCTIONS ==========
-        function showLandingPage(activeTab) {
-            landingPage.classList.remove('hidden');
+        function hideAllMainViews() {
+            landingPage.classList.add('hidden');
             logForm.classList.add('hidden');
             aircraftList.classList.add('hidden');
             inactiveAircraftList.classList.add('hidden');
             randomReviewPage.classList.add('hidden');
-            setLandingTab(activeTab === 'tools' ? 'tools' : 'log');
+            landingPage.hidden = true;
+            logForm.hidden = true;
+            aircraftList.hidden = true;
+            inactiveAircraftList.hidden = true;
+            randomReviewPage.hidden = true;
+        }
+
+        function showLandingPage(activeTab) {
+            hideAllMainViews();
+            landingPage.classList.remove('hidden');
+            landingPage.hidden = false;
+            window.scrollTo(0, 0);
+            const tab = (activeTab === 'tools' || activeTab === 'fleets') ? activeTab : 'log';
+            setLandingTab(tab);
+        }
+
+        // ========== FLEETS ==========
+        function getLoadedAirlines() {
+            const byNorm = new Map();
+            const addAirline = (name) => {
+                const trimmed = (name || '').trim();
+                if (!trimmed || trimmed.toLowerCase() === 'unknown') return;
+                const norm = normalizeAirlineName(trimmed);
+                if (!norm) return;
+                if (!byNorm.has(norm)) byNorm.set(norm, trimmed);
+            };
+
+            aircraftData.forEach(aircraft => {
+                const display = getAircraftDisplayInfo(aircraft);
+                addAirline(display.currentOperator);
+                addAirline(aircraft.airline);
+                if (Array.isArray(aircraft.history)) {
+                    aircraft.history.forEach(item => addAirline(item.operator));
+                }
+            });
+            Object.keys(fleetData || {}).forEach(addAirline);
+            return Array.from(byNorm.values()).sort((a, b) => a.localeCompare(b));
+        }
+
+        function getFleetAirlineKey(airline) {
+            return (airline || '').trim();
+        }
+
+        function ensureFleetAirlineArray(airline) {
+            const key = getFleetAirlineKey(airline);
+            if (!key) return [];
+            if (!Array.isArray(fleetData[key])) {
+                // Migrate older fleetData keyed under a different display name with same normalized value
+                const norm = normalizeAirlineName(key);
+                const existingKey = Object.keys(fleetData).find(k => normalizeAirlineName(k) === norm && Array.isArray(fleetData[k]));
+                if (existingKey && existingKey !== key) {
+                    fleetData[key] = fleetData[existingKey];
+                } else {
+                    fleetData[key] = [];
+                }
+            }
+            return fleetData[key];
+        }
+
+        function findManualFleetEntry(airline, registration, view) {
+            const key = normalizeRegistrationKey(registration);
+            if (!key) return null;
+            const list = ensureFleetAirlineArray(airline);
+            return list.find(entry => {
+                if (normalizeRegistrationKey(entry.registration) !== key) return false;
+                const entryView = entry.view === 'historic' ? 'historic' : 'active';
+                return entryView === view;
+            }) || null;
+        }
+
+        function airlinesMatch(a, b) {
+            return normalizeAirlineName(a) === normalizeAirlineName(b);
+        }
+
+        function getSelectedFleetAirline() {
+            return fleetAirlineSelect ? fleetAirlineSelect.value.trim() : '';
+        }
+
+            function setFleetView(view) {
+            fleetView = view === 'historic' ? 'historic' : 'active';
+            if (fleetSubtabActive && fleetSubtabHistoric) {
+                const activeSelected = fleetView === 'active';
+                fleetSubtabActive.classList.toggle('is-active', activeSelected);
+                fleetSubtabHistoric.classList.toggle('is-active', !activeSelected);
+                fleetSubtabActive.setAttribute('aria-selected', activeSelected ? 'true' : 'false');
+                fleetSubtabHistoric.setAttribute('aria-selected', activeSelected ? 'false' : 'true');
+                fleetSubtabActive.tabIndex = activeSelected ? 0 : -1;
+                fleetSubtabHistoric.tabIndex = activeSelected ? -1 : 0;
+            }
+            if (fleetEditMode) renderFleetUpdateManualList();
+            renderFleetList();
+        }
+
+        function populateFleetAirlineSelect() {
+            if (!fleetAirlineSelect) return;
+            const previous = fleetAirlineSelect.value;
+            const airlines = getLoadedAirlines();
+            fleetAirlineSelect.innerHTML = '<option value="">Select an airline…</option>';
+            airlines.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                fleetAirlineSelect.appendChild(option);
+            });
+            if (previous && airlines.some(a => airlinesMatch(a, previous))) {
+                const match = airlines.find(a => airlinesMatch(a, previous)) || previous;
+                fleetAirlineSelect.value = match;
+            }
+            const hasAirline = !!fleetAirlineSelect.value;
+            if (fleetEditBtn) fleetEditBtn.disabled = !hasAirline;
+            if (fleetSubtabActive) fleetSubtabActive.disabled = !hasAirline;
+            if (fleetSubtabHistoric) fleetSubtabHistoric.disabled = !hasAirline;
+        }
+
+        function setFleetEditMode(enabled) {
+            fleetEditMode = !!enabled && !!(fleetAirlineSelect && fleetAirlineSelect.value);
+            if (fleetEditPanel) fleetEditPanel.classList.toggle('hidden', !fleetEditMode);
+            if (fleetEditBtn) {
+                fleetEditBtn.textContent = fleetEditMode ? 'Updating…' : 'Update fleet';
+                fleetEditBtn.disabled = !(fleetAirlineSelect && fleetAirlineSelect.value);
+            }
+            if (!fleetEditMode && fleetAddRegs) fleetAddRegs.value = '';
+            if (fleetEditMode) {
+                renderFleetUpdateManualList();
+                setTimeout(() => {
+                    if (fleetAddRegs) fleetAddRegs.focus();
+                }, 0);
+            } else if (fleetUpdateManualList) {
+                fleetUpdateManualList.innerHTML = '';
+            }
+        }
+
+        function getCurrentSeenForAirline(aircraft, airline) {
+            let seen = !!aircraft.currentIsSeen;
+            if (Array.isArray(aircraft.history)) {
+                const current = aircraft.history.find(item => item.isCurrent);
+                if (current && airlinesMatch(current.operator, airline) && current.isSeen) {
+                    seen = true;
+                }
+            }
+            return seen;
+        }
+
+        function getFleetViewOverride(airline, registration) {
+            const airlineKey = getFleetAirlineKey(airline);
+            const regKey = normalizeRegistrationKey(registration);
+            if (!airlineKey || !regKey) return null;
+            const bucket = fleetViewOverrides[airlineKey];
+            if (!bucket || typeof bucket !== 'object') return null;
+            const value = bucket[regKey];
+            return value === 'historic' || value === 'active' ? value : null;
+        }
+
+        function getEffectiveFleetView(airline, registration, naturalView) {
+            return getFleetViewOverride(airline, registration) || naturalView || 'active';
+        }
+
+        function forceFleetRegistrationView(airline, registration, targetView) {
+            const airlineKey = getFleetAirlineKey(airline);
+            const regKey = normalizeRegistrationKey(registration);
+            const nextView = targetView === 'historic' ? 'historic' : 'active';
+            if (!airlineKey || !regKey) return;
+
+            if (!fleetViewOverrides[airlineKey] || typeof fleetViewOverrides[airlineKey] !== 'object') {
+                fleetViewOverrides[airlineKey] = {};
+            }
+            fleetViewOverrides[airlineKey][regKey] = nextView;
+
+            ensureFleetAirlineArray(airline).forEach(entry => {
+                if (normalizeRegistrationKey(entry.registration) !== regKey) return;
+                entry.view = nextView;
+            });
+
+            const pendingIdx = findSeenNotLoggedIndex(airline, registration);
+            if (pendingIdx >= 0) {
+                seenNotLogged[pendingIdx].view = nextView;
+            }
+        }
+
+        /** After logging/editing: current airline stays Active/Historic by in-service; previous operators move to Historic. */
+        function syncFleetListsForSavedAircraft(aircraft) {
+            if (!aircraft) return;
+            const display = getAircraftDisplayInfo(aircraft);
+            const currentOp = (display.currentOperator || '').trim();
+            const currentReg = (display.currentReg || '').trim();
+            const currentRegKey = normalizeRegistrationKey(currentReg);
+
+            if (currentOp && currentOp.toLowerCase() !== 'unknown' && currentReg) {
+                forceFleetRegistrationView(
+                    currentOp,
+                    currentReg,
+                    aircraft.inService ? 'active' : 'historic'
+                );
+            }
+
+            if (Array.isArray(aircraft.history)) {
+                aircraft.history.forEach(item => {
+                    const op = (item.operator || '').trim();
+                    const reg = (item.registration || '').trim();
+                    if (!op || !reg || op.toLowerCase() === 'unknown') return;
+
+                    const isCurrentPair =
+                        !!item.isCurrent &&
+                        airlinesMatch(op, currentOp) &&
+                        normalizeRegistrationKey(reg) === currentRegKey;
+                    if (isCurrentPair) return;
+
+                    // Former operator (e.g. Ryanair) while current is another airline → Historic
+                    forceFleetRegistrationView(op, reg, 'historic');
+                });
+            }
+
+            saveFleetViewOverrides();
+            saveFleetData();
+            saveSeenNotLogged();
+        }
+
+        function setFleetRegistrationListView(airline, registration, targetView, naturalView) {
+            const airlineKey = getFleetAirlineKey(airline);
+            const regKey = normalizeRegistrationKey(registration);
+            const nextView = targetView === 'historic' ? 'historic' : 'active';
+            if (!airlineKey || !regKey) return;
+
+            if (!fleetViewOverrides[airlineKey] || typeof fleetViewOverrides[airlineKey] !== 'object') {
+                fleetViewOverrides[airlineKey] = {};
+            }
+
+            if (naturalView && nextView === naturalView) {
+                delete fleetViewOverrides[airlineKey][regKey];
+                if (!Object.keys(fleetViewOverrides[airlineKey]).length) {
+                    delete fleetViewOverrides[airlineKey];
+                }
+            } else {
+                fleetViewOverrides[airlineKey][regKey] = nextView;
+            }
+
+            // Keep any manual fleet rows in sync with the chosen list
+            ensureFleetAirlineArray(airline).forEach(entry => {
+                if (normalizeRegistrationKey(entry.registration) !== regKey) return;
+                entry.view = nextView;
+            });
+
+            const pendingIdx = findSeenNotLoggedIndex(airline, registration);
+            if (pendingIdx >= 0) {
+                seenNotLogged[pendingIdx].view = nextView;
+                saveSeenNotLogged();
+            }
+
+            saveFleetViewOverrides();
+            saveFleetData();
+            renderFleetList();
+            if (fleetEditMode) renderFleetUpdateManualList();
+        }
+
+        function buildFleetEntriesForAirline(airline, view) {
+            const byReg = new Map();
+
+            const upsert = (entry) => {
+                const regKey = normalizeRegistrationKey(entry.registration);
+                if (!regKey) return;
+                const existing = byReg.get(regKey);
+                if (!existing) {
+                    byReg.set(regKey, entry);
+                    return;
+                }
+                if (entry.source === 'log') {
+                    // Log evidence wins over manual list placement for natural view
+                    if (entry.naturalView === 'active' || existing.source !== 'log') {
+                        existing.naturalView = entry.naturalView;
+                    } else if (entry.naturalView === 'historic' && existing.naturalView !== 'active') {
+                        existing.naturalView = 'historic';
+                    }
+                    if (entry.seen) existing.seen = true;
+                    if (existing.aircraftIndex == null && entry.aircraftIndex != null) {
+                        existing.aircraftIndex = entry.aircraftIndex;
+                    }
+                    existing.source = 'log';
+                } else if (entry.manual) {
+                    existing.manual = true;
+                    // Manual only sets natural view when there is no log-backed placement yet
+                    if (existing.source !== 'log') {
+                        existing.naturalView = entry.naturalView;
+                    }
+                }
+            };
+
+            // Natural active
+            aircraftData.forEach((aircraft, index) => {
+                if (!aircraft.inService) return;
+                const display = getAircraftDisplayInfo(aircraft);
+                if (!airlinesMatch(display.currentOperator, airline)) return;
+                const reg = (display.currentReg || '').trim();
+                if (!reg) return;
+                upsert({
+                    registration: reg,
+                    seen: getCurrentSeenForAirline(aircraft, airline),
+                    aircraftIndex: index,
+                    source: 'log',
+                    naturalView: 'active',
+                    view: 'active'
+                });
+            });
+
+            // Natural historic
+            aircraftData.forEach((aircraft, index) => {
+                const display = getAircraftDisplayInfo(aircraft);
+                const currentIsThisAirline = airlinesMatch(display.currentOperator, airline);
+                const currentOnActive = currentIsThisAirline && !!aircraft.inService;
+
+                if (Array.isArray(aircraft.history)) {
+                    aircraft.history.forEach(item => {
+                        if (!airlinesMatch(item.operator, airline)) return;
+                        if (item.isCurrent && currentOnActive) return;
+                        const reg = (item.registration || '').trim();
+                        if (!reg) return;
+                        upsert({
+                            registration: reg,
+                            seen: !!item.isSeen,
+                            aircraftIndex: index,
+                            source: 'log',
+                            naturalView: 'historic',
+                            view: 'historic'
+                        });
+                    });
+                }
+
+                if (currentIsThisAirline && !aircraft.inService) {
+                    const reg = (display.currentReg || '').trim();
+                    if (reg) {
+                        upsert({
+                            registration: reg,
+                            seen: getCurrentSeenForAirline(aircraft, airline),
+                            aircraftIndex: index,
+                            source: 'log',
+                            naturalView: 'historic',
+                            view: 'historic'
+                        });
+                    }
+                }
+
+                if (!currentIsThisAirline && airlinesMatch(aircraft.airline, airline)) {
+                    const reg = (aircraft.registration || display.currentReg || '').trim();
+                    if (reg) {
+                        upsert({
+                            registration: reg,
+                            seen: false,
+                            aircraftIndex: index,
+                            source: 'log',
+                            naturalView: 'historic',
+                            view: 'historic'
+                        });
+                    }
+                }
+            });
+
+            // Manual additions (seen stays false until present in the log)
+            ensureFleetAirlineArray(airline).forEach(entry => {
+                const entryView = entry.view === 'historic' ? 'historic' : 'active';
+                const reg = (entry.registration || '').trim();
+                if (!reg) return;
+                upsert({
+                    registration: reg,
+                    seen: false,
+                    aircraftIndex: null,
+                    source: 'manual',
+                    manual: true,
+                    naturalView: entryView,
+                    view: entryView
+                });
+            });
+
+            return Array.from(byReg.values())
+                .map(entry => {
+                    const naturalView = entry.naturalView === 'historic' ? 'historic' : 'active';
+                    const effectiveView = getEffectiveFleetView(airline, entry.registration, naturalView);
+                    return {
+                        ...entry,
+                        naturalView,
+                        view: effectiveView
+                    };
+                })
+                .filter(entry => entry.view === view)
+                .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''));
+        }
+
+        function updateFleetSummary(list, totalForView, filtered) {
+            if (!fleetSummary) return;
+            if (!list || (!list.length && !filtered)) {
+                fleetSummary.textContent = '';
+                return;
+            }
+            const seen = list.filter(e => e.seen).length;
+            const label = fleetView === 'historic' ? 'historic' : 'active';
+            if (filtered && typeof totalForView === 'number') {
+                fleetSummary.textContent = `${seen}/${list.length} seen · showing ${list.length} of ${totalForView} · ${label}`;
+            } else {
+                fleetSummary.textContent = `${seen}/${list.length} seen · ${label}`;
+            }
+        }
+
+        function applySeenToLog(airline, entry, seen) {
+            if (entry.aircraftIndex == null || entry.aircraftIndex < 0) return;
+            const aircraft = aircraftData[entry.aircraftIndex];
+            if (!aircraft) return;
+            const display = getAircraftDisplayInfo(aircraft);
+            const isCurrentAirlinePair =
+                airlinesMatch(display.currentOperator, airline) &&
+                normalizeRegistrationKey(display.currentReg) === normalizeRegistrationKey(entry.registration);
+
+            if (entry.view === 'active' || isCurrentAirlinePair) {
+                aircraft.currentIsSeen = !!seen;
+                if (Array.isArray(aircraft.history)) {
+                    aircraft.history.forEach(item => {
+                        if (item.isCurrent && airlinesMatch(item.operator, airline)) {
+                            item.isSeen = !!seen;
+                        }
+                    });
+                }
+            } else if (Array.isArray(aircraft.history)) {
+                const regKey = normalizeRegistrationKey(entry.registration);
+                aircraft.history.forEach(item => {
+                    if (!airlinesMatch(item.operator, airline)) return;
+                    if (normalizeRegistrationKey(item.registration) !== regKey) return;
+                    if (item.isCurrent && airlinesMatch(display.currentOperator, airline)) return;
+                    item.isSeen = !!seen;
+                });
+            }
+            saveAircraftData();
+        }
+
+        function setFleetEntrySeen(airline, entry, seen) {
+            entry.seen = !!seen;
+            applySeenToLog(airline, entry, seen);
+
+            const manual = findManualFleetEntry(airline, entry.registration, entry.view || fleetView);
+            if (manual) {
+                manual.seen = !!seen;
+                saveFleetData();
+            } else if (entry.manual || entry.source === 'manual') {
+                const list = ensureFleetAirlineArray(airline);
+                list.push({
+                    registration: entry.registration,
+                    seen: !!seen,
+                    view: entry.view || fleetView
+                });
+                saveFleetData();
+            }
+
+            const rows = buildFleetEntriesForAirline(airline, fleetView);
+            updateFleetSummary(rows);
+        }
+
+        function removeManualFleetEntry(airline, registration, view) {
+            const key = getFleetAirlineKey(airline);
+            const regKey = normalizeRegistrationKey(registration);
+            fleetData[key] = ensureFleetAirlineArray(airline).filter(entry => {
+                if (normalizeRegistrationKey(entry.registration) !== regKey) return true;
+                const entryView = entry.view === 'historic' ? 'historic' : 'active';
+                return entryView !== view;
+            });
+            saveFleetData();
+            renderFleetUpdateManualList();
+            renderFleetList();
+        }
+
+        function addFleetRegistrationsFromInput() {
+            const airline = getSelectedFleetAirline();
+            if (!airline || !fleetAddRegs) return;
+            const lines = fleetAddRegs.value.split(/\r?\n|,|;/).map(s => s.trim().toUpperCase()).filter(Boolean);
+            if (!lines.length) {
+                alert('Enter at least one registration.');
+                return;
+            }
+
+            const existing = buildFleetEntriesForAirline(airline, fleetView);
+            const existingKeys = new Set(existing.map(e => normalizeRegistrationKey(e.registration)));
+            const list = ensureFleetAirlineArray(airline);
+            let added = 0;
+
+            lines.forEach(reg => {
+                const regKey = normalizeRegistrationKey(reg);
+                if (!regKey || existingKeys.has(regKey)) return;
+                if (findManualFleetEntry(airline, reg, fleetView)) return;
+                list.push({
+                    registration: reg,
+                    seen: false,
+                    view: fleetView
+                });
+                existingKeys.add(regKey);
+                added += 1;
+            });
+
+            saveFleetData();
+            fleetAddRegs.value = '';
+            renderFleetUpdateManualList();
+            if (added === 0) {
+                alert('Those registrations are already on this list.');
+            }
+        }
+
+        function renderFleetUpdateManualList() {
+            if (!fleetUpdateManualList) return;
+            const airline = getSelectedFleetAirline();
+            if (!airline) {
+                fleetUpdateManualList.innerHTML = '';
+                return;
+            }
+
+            const manuals = ensureFleetAirlineArray(airline)
+                .filter(entry => (entry.view === 'historic' ? 'historic' : 'active') === fleetView)
+                .slice()
+                .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''));
+
+            if (!manuals.length) {
+                fleetUpdateManualList.innerHTML = '<p class="fleet-empty">No manually added registrations on this list yet.</p>';
+                return;
+            }
+
+            fleetUpdateManualList.innerHTML = '';
+            manuals.forEach(entry => {
+                const row = document.createElement('div');
+                row.className = 'fleet-row';
+                row.innerHTML = `
+                    <div class="fleet-row-reg">
+                        ${buildRegLinkHtml(entry.registration, 'fleet-reg')}
+                    </div>
+                    <div class="fleet-row-actions"></div>
+                `;
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'button delete';
+                removeBtn.textContent = 'Remove';
+                removeBtn.addEventListener('click', () => {
+                    if (confirm(`Remove ${entry.registration} from this list?`)) {
+                        removeManualFleetEntry(airline, entry.registration, fleetView);
+                    }
+                });
+                row.querySelector('.fleet-row-actions').appendChild(removeBtn);
+                fleetUpdateManualList.appendChild(row);
+            });
+        }
+
+        function renderFleetList() {
+            if (!fleetList) return;
+            const airline = getSelectedFleetAirline();
+            const hasAirline = !!airline;
+            if (fleetEditBtn) fleetEditBtn.disabled = !hasAirline;
+            if (fleetSubtabActive) fleetSubtabActive.disabled = !hasAirline;
+            if (fleetSubtabHistoric) fleetSubtabHistoric.disabled = !hasAirline;
+            if (fleetRegSearch) {
+                fleetRegSearch.disabled = !hasAirline;
+                if (!hasAirline) fleetRegSearch.value = '';
+            }
+
+            if (!hasAirline) {
+                fleetList.innerHTML = '<p class="fleet-empty">Choose an airline to view active and historic registrations.</p>';
+                updateFleetSummary([]);
+                return;
+            }
+
+            const searchVal = fleetRegSearch ? fleetRegSearch.value.trim().toLowerCase().replace(/-/g, '') : '';
+            let list = buildFleetEntriesForAirline(airline, fleetView);
+            const totalForView = list.length;
+            if (searchVal) {
+                list = list.filter(entry =>
+                    normalizeRegistrationKey(entry.registration).toLowerCase().includes(searchVal) ||
+                    (entry.registration || '').toLowerCase().includes(searchVal)
+                );
+            }
+            updateFleetSummary(list, totalForView, !!searchVal);
+
+            if (!list.length) {
+                const emptyMsg = searchVal
+                    ? `No registrations match “${fleetRegSearch.value.trim()}”.`
+                    : (fleetView === 'historic'
+                        ? 'No historic registrations for this airline. Use Update fleet to add ones you have not seen.'
+                        : 'No active registrations for this airline. Use Update fleet to add ones you have not seen.');
+                fleetList.innerHTML = `<p class="fleet-empty">${emptyMsg}</p>`;
+                return;
+            }
+
+            fleetList.innerHTML = '';
+            list.forEach(entry => {
+                const row = document.createElement('div');
+                row.className = 'fleet-row';
+                const isHistoric = entry.view === 'historic';
+                row.innerHTML = `
+                    <label class="fleet-row-check" title="Seen status from your log">
+                        <input type="checkbox" ${entry.seen ? 'checked' : ''} disabled aria-label="Seen ${escapeHtml(entry.registration)}">
+                    </label>
+                    <div class="fleet-row-reg">
+                        ${buildRegLinkHtml(entry.registration, 'fleet-reg')}
+                    </div>
+                    <label class="fleet-historic-toggle" title="Move between Active and Historic">
+                        <input type="checkbox" ${isHistoric ? 'checked' : ''} aria-label="Historic ${escapeHtml(entry.registration)}">
+                        <span>Historic</span>
+                    </label>
+                    <div class="fleet-row-actions"></div>
+                `;
+
+                const historicToggle = row.querySelector('.fleet-historic-toggle input');
+                historicToggle.addEventListener('change', () => {
+                    setFleetRegistrationListView(
+                        airline,
+                        entry.registration,
+                        historicToggle.checked ? 'historic' : 'active',
+                        entry.naturalView || (isHistoric ? 'historic' : 'active')
+                    );
+                });
+
+                const actions = row.querySelector('.fleet-row-actions');
+                if (entry.aircraftIndex != null) {
+                    const editBtn = document.createElement('button');
+                    editBtn.type = 'button';
+                    editBtn.className = 'button edit';
+                    editBtn.textContent = 'Edit';
+                    editBtn.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setFleetEditMode(false);
+                        window._returnToFleetsAfterEdit = true;
+                        editAircraft(entry.aircraftIndex);
+                    });
+                    actions.appendChild(editBtn);
+                } else if (!entry.seen) {
+                    const marked = isSeenNotLogged(airline, entry.registration);
+                    const markBtn = document.createElement('button');
+                    markBtn.type = 'button';
+                    markBtn.className = 'button mark-seen' + (marked ? ' is-marked' : '');
+                    markBtn.textContent = 'Mark as seen';
+                    markBtn.setAttribute('aria-pressed', marked ? 'true' : 'false');
+                    markBtn.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        toggleSeenNotLogged(airline, entry.registration, entry.view || fleetView);
+                        const nowMarked = isSeenNotLogged(airline, entry.registration);
+                        markBtn.classList.toggle('is-marked', nowMarked);
+                        markBtn.setAttribute('aria-pressed', nowMarked ? 'true' : 'false');
+                    });
+                    actions.appendChild(markBtn);
+                }
+
+                fleetList.appendChild(row);
+            });
+        }
+
+        function isSeenNotLogged(airline, registration) {
+            const regKey = normalizeRegistrationKey(registration);
+            const airlineKey = normalizeAirlineName(airline);
+            return seenNotLogged.some(item =>
+                normalizeRegistrationKey(item.registration) === regKey &&
+                normalizeAirlineName(item.airline) === airlineKey
+            );
+        }
+
+        function findSeenNotLoggedIndex(airline, registration) {
+            const regKey = normalizeRegistrationKey(registration);
+            const airlineKey = normalizeAirlineName(airline);
+            return seenNotLogged.findIndex(item =>
+                normalizeRegistrationKey(item.registration) === regKey &&
+                normalizeAirlineName(item.airline) === airlineKey
+            );
+        }
+
+        function toggleSeenNotLogged(airline, registration, view) {
+            const existing = findSeenNotLoggedIndex(airline, registration);
+            if (existing >= 0) {
+                seenNotLogged.splice(existing, 1);
+            } else {
+                seenNotLogged.push({
+                    registration: (registration || '').trim().toUpperCase(),
+                    airline: (airline || '').trim(),
+                    view: view === 'historic' ? 'historic' : 'active',
+                    markedAt: new Date().toISOString()
+                });
+            }
+            saveSeenNotLogged();
+            if (landingPanelTools && !landingPanelTools.classList.contains('hidden')) {
+                renderSeenNotLoggedList();
+            }
+        }
+
+        function removeSeenNotLogged(airline, registration) {
+            const idx = findSeenNotLoggedIndex(airline, registration);
+            if (idx < 0) return;
+            seenNotLogged.splice(idx, 1);
+            saveSeenNotLogged();
+            renderSeenNotLoggedList();
+            if (getSelectedFleetAirline() && airlinesMatch(getSelectedFleetAirline(), airline)) {
+                renderFleetList();
+            }
+        }
+
+        function addFleetLogEntry(airline, registration, view, options = {}) {
+            const reg = (registration || '').trim().toUpperCase();
+            const operator = (airline || '').trim();
+            if (!reg || !operator) return;
+
+            window._returnToFleetsAfterEdit = !options.fromTools;
+            window._returnToToolsAfterEdit = !!options.fromTools;
+            window._pendingSeenNotLogged = { registration: reg, airline: operator };
+
+            showLogForm(false);
+            formTitle.textContent = 'Log Aircraft';
+            editIndexInput.value = -1;
+            saveBtn.textContent = 'Save Aircraft';
+
+            resetHistoryItems();
+            const isActiveFleet = view !== 'historic';
+            addHistoryItem(reg, operator, true, false);
+            inServiceCheckbox.checked = isActiveFleet;
+            toggleOutOfServiceSection();
+            syncSightingsSection();
+            hideLookupPicker(createMainFormLookupContext());
+            setLookupStatus(document.getElementById('regLookupStatus'), '', null);
+            window.scrollTo(0, 0);
+            setTimeout(() => {
+                const typeInput = document.getElementById('aircraftType');
+                if (typeInput) typeInput.focus();
+            }, 0);
+        }
+
+        function pruneSeenNotLoggedAgainstLog() {
+            const before = seenNotLogged.length;
+            seenNotLogged = seenNotLogged.filter(item => {
+                for (let i = 0; i < aircraftData.length; i++) {
+                    const aircraft = aircraftData[i];
+                    const display = getAircraftDisplayInfo(aircraft);
+                    if (
+                        normalizeRegistrationKey(display.currentReg) === normalizeRegistrationKey(item.registration) &&
+                        airlinesMatch(display.currentOperator, item.airline) &&
+                        getCurrentSeenForAirline(aircraft, item.airline)
+                    ) {
+                        return false;
+                    }
+                    if (Array.isArray(aircraft.history)) {
+                        const histSeen = aircraft.history.some(h =>
+                            normalizeRegistrationKey(h.registration) === normalizeRegistrationKey(item.registration) &&
+                            airlinesMatch(h.operator, item.airline) &&
+                            !!h.isSeen
+                        );
+                        if (histSeen) return false;
+                    }
+                }
+                return true;
+            });
+            if (seenNotLogged.length !== before) saveSeenNotLogged();
+        }
+
+        function renderSeenNotLoggedList() {
+            if (!seenNotLoggedList) return;
+            pruneSeenNotLoggedAgainstLog();
+
+            if (!seenNotLogged.length) {
+                seenNotLoggedList.innerHTML = '<p class="fleet-empty">No seen-but-not-logged registrations.</p>';
+                return;
+            }
+
+            const sorted = seenNotLogged.slice().sort((a, b) => {
+                const airlineCmp = (a.airline || '').localeCompare(b.airline || '');
+                if (airlineCmp !== 0) return airlineCmp;
+                return (a.registration || '').localeCompare(b.registration || '');
+            });
+
+            seenNotLoggedList.innerHTML = '';
+            sorted.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'seen-pending-row';
+                const viewLabel = item.view === 'historic' ? 'Historic' : 'Active';
+                row.innerHTML = `
+                    <div class="seen-pending-info">
+                        <span class="seen-pending-reg">${escapeHtml(item.registration)}</span>
+                        <span class="seen-pending-meta">${escapeHtml(item.airline)} · ${viewLabel}</span>
+                    </div>
+                    <div class="seen-pending-actions"></div>
+                `;
+                const actions = row.querySelector('.seen-pending-actions');
+
+                const logBtn = document.createElement('button');
+                logBtn.type = 'button';
+                logBtn.className = 'button';
+                logBtn.textContent = 'Log';
+                logBtn.addEventListener('click', () => {
+                    addFleetLogEntry(item.airline, item.registration, item.view || 'active', { fromTools: true });
+                });
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'button delete';
+                removeBtn.textContent = 'Remove';
+                removeBtn.addEventListener('click', () => {
+                    removeSeenNotLogged(item.airline, item.registration);
+                });
+
+                actions.appendChild(logBtn);
+                actions.appendChild(removeBtn);
+                seenNotLoggedList.appendChild(row);
+            });
         }
         
         function showLogForm(isEdit = false) {
-            landingPage.classList.add('hidden');
+            hideAllMainViews();
             logForm.classList.remove('hidden');
-            aircraftList.classList.add('hidden');
-            inactiveAircraftList.classList.add('hidden');
-            randomReviewPage.classList.add('hidden'); // Hide random review page when showing log form
+            logForm.hidden = false;
+            // Fleet/list can leave the page scrolled; jump to the top of the edit view
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
             formTitle.textContent = 'Log Aircraft';
             editIndexInput.value = -1;
+            saveBtn.textContent = 'Save Aircraft';
             aircraftForm.reset();
             resetHistoryItems();
             resetTripItems();
@@ -1430,26 +2702,29 @@
                     const firstReg = historyItemsContainer.querySelector('.history-reg');
                     if (firstReg) firstReg.focus();
                 }, 0);
+            } else {
+                setTimeout(() => {
+                    window.scrollTo(0, 0);
+                    logForm.scrollIntoView({ block: 'start' });
+                }, 0);
             }
         }
         
         function showAircraftList() {
-            landingPage.classList.add('hidden');
-            logForm.classList.add('hidden');
+            hideAllMainViews();
             aircraftList.classList.remove('hidden');
-            inactiveAircraftList.classList.add('hidden');
-            randomReviewPage.classList.add('hidden'); // Hide random review page when showing aircraft list
+            aircraftList.hidden = false;
+            window.scrollTo(0, 0);
             // Set default sort to registration
             if (sortFilter) sortFilter.value = 'registration';
             displayAircraftList();
         }
         
         function showInactiveAircraftList() {
-            landingPage.classList.add('hidden');
-            logForm.classList.add('hidden');
-            aircraftList.classList.add('hidden');
+            hideAllMainViews();
             inactiveAircraftList.classList.remove('hidden');
-            randomReviewPage.classList.add('hidden'); // Hide random review page when showing inactive list
+            inactiveAircraftList.hidden = false;
+            window.scrollTo(0, 0);
             displayInactiveAircraftList();
         }
         
@@ -1872,24 +3147,29 @@
             
             const isInService = inServiceCheckbox.checked;
             const buttonText = isInService ? 'Current' : 'Last Known';
+            const enableLookup = parseInt(editIndexInput.value, 10) >= 0;
             
             historyItem.innerHTML = `
                 <div class="history-reg-row-fields">
                     <input type="text" class="history-reg reg-format" placeholder="Registration" value="${registration}" required>
-                    <input type="text" class="history-operator" placeholder="Operator (auto-filled)" value="${operator}">
+                    <input type="text" class="history-operator" placeholder="${enableLookup ? 'Operator (auto-filled)' : 'Operator'}" value="${operator}">
+                    ${enableLookup ? `
                     <button type="button" class="button secondary lookup-reg-btn">Look up</button>
                     <button type="button" class="button secondary undo-lookup-btn hidden">Undo</button>
+                    ` : ''}
                     <div class="history-actions">
                         <button type="button" class="button ${isInService ? 'current-reg-btn' : 'last-known-btn'} set-current-btn">${buttonText}</button>
                         <button type="button" class="button seen set-seen-btn">Seen</button>
                         <button type="button" class="button delete remove-history-btn">×</button>
                     </div>
                 </div>
+                ${enableLookup ? `
                 <div class="history-reg-lookup-status reg-lookup-status hidden" aria-live="polite"></div>
                 <div class="history-lookup-match-row hidden">
                     <label>Choose operator / type from lookup:</label>
                     <select class="history-lookup-match-picker"></select>
                 </div>
+                ` : ''}
                 <input type="checkbox" class="current-reg-checkbox hidden" ${isCurrent ? 'checked' : ''}>
                 <input type="checkbox" class="seen-checkbox hidden" ${isSeen ? 'checked' : ''}>
             `;
@@ -1899,21 +3179,24 @@
             const regInputEl = historyItem.querySelector('.history-reg');
             regInputEl.addEventListener('input', function() {
                 this.value = this.value.toUpperCase();
+                if (!enableLookup) return;
                 clearLookupUndo(historyItem);
                 hideRowLookupMatch(historyItem);
             });
             attachRegistrationDuplicateCheck(regInputEl, null);
-            const lookupContext = createMainFormLookupContext();
-            attachRowLookupMatchPicker(historyItem, lookupContext);
-            historyItem.querySelector('.lookup-reg-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                const regInput = historyItem.querySelector('.history-reg');
-                if (regInput) runRegistrationLookup(regInput, historyItem, lookupContext);
-            });
-            historyItem.querySelector('.undo-lookup-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                undoRegistrationLookup(historyItem, lookupContext);
-            });
+            const lookupContext = enableLookup ? createMainFormLookupContext() : null;
+            if (enableLookup) {
+                attachRowLookupMatchPicker(historyItem, lookupContext);
+                historyItem.querySelector('.lookup-reg-btn').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const regInput = historyItem.querySelector('.history-reg');
+                    if (regInput) runRegistrationLookup(regInput, historyItem, lookupContext);
+                });
+                historyItem.querySelector('.undo-lookup-btn').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    undoRegistrationLookup(historyItem, lookupContext);
+                });
+            }
             
             historyItem.querySelector('.remove-history-btn').addEventListener('click', () => {
                 if (document.querySelectorAll('#historyItemsContainer .history-reg-row').length > 1) {
@@ -1938,6 +3221,7 @@
                 this.textContent = `✓ ${buttonText}`;
                 this.style.backgroundColor = '#34c759';
 
+                if (!enableLookup) return;
                 const regInput = historyItem.querySelector('.history-reg');
                 if (regInput && regInput.value.trim().length >= 3) {
                     runRegistrationLookup(regInput, historyItem, lookupContext);
@@ -2744,8 +4028,24 @@
                 aircraftData.push(aircraft);
             }
             saveAircraftData();
+            syncFleetListsForSavedAircraft(aircraft);
+
+            if (window._pendingSeenNotLogged) {
+                removeSeenNotLogged(
+                    window._pendingSeenNotLogged.airline,
+                    window._pendingSeenNotLogged.registration
+                );
+                window._pendingSeenNotLogged = null;
+            }
+
             alert('Aircraft saved successfully!');
-            showLandingPage();
+            const backToTools = !!window._returnToToolsAfterEdit;
+            const backToFleets = !!window._returnToFleetsAfterEdit;
+            window._returnToToolsAfterEdit = false;
+            window._returnToFleetsAfterEdit = false;
+            if (backToTools) showLandingPage('tools');
+            else if (backToFleets) showLandingPage('fleets');
+            else showLandingPage();
         }
 
         function logSearchMatchesFields(searchVal, registration, operator) {
@@ -2945,11 +4245,14 @@
         
         // ========== CRUD OPERATIONS ==========
         function editAircraft(index) {
-            showLogForm(true); // Move this to the top and pass true
+            // Same dedicated edit page used from My Log
+            showLogForm(true);
             const aircraft = aircraftData[index];
+            if (!aircraft) return;
             formTitle.textContent = 'Edit Aircraft';
             editIndexInput.value = index;
             saveBtn.textContent = 'Update Aircraft';
+            window.scrollTo(0, 0);
             document.getElementById('aircraftType').value = aircraft.type || '';
             // Fill in-service status
             inServiceCheckbox.checked = aircraft.inService;
@@ -3087,10 +4390,7 @@
             showRandomAircraftForReview();
         }
         function showRandomReviewPage() {
-            landingPage.classList.add('hidden');
-            logForm.classList.add('hidden');
-            aircraftList.classList.add('hidden');
-            inactiveAircraftList.classList.add('hidden');
+            hideAllMainViews();
             randomReviewPage.classList.remove('hidden');
         }
         function showRandomAircraftForReview() {
@@ -3362,6 +4662,7 @@
                 eligible[index] = aircraft;
             }
             saveAircraftData();
+            syncFleetListsForSavedAircraft(aircraft);
         }
         // Helper functions for random review form (addHistoryItem, addTripItem, addSightingItem)
         function addHistoryItemRandom(registration, operator, isCurrent, isSeen, wrapper) {
