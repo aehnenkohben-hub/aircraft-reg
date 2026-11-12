@@ -1787,6 +1787,7 @@
             loadFleetData();
             loadFleetViewOverrides();
             loadSeenNotLogged();
+            pruneEmptyFleetAirlines();
             setupEventListeners();
             setLandingTab('log');
             addHistoryItem('', '', true);
@@ -2030,6 +2031,30 @@
         }
 
         // ========== FLEETS ==========
+        function fleetAirlineHasRegistrations(airlineName) {
+            const list = fleetData?.[airlineName];
+            return Array.isArray(list) && list.some(entry => String(entry?.registration || '').trim());
+        }
+
+        function pruneEmptyFleetAirlines() {
+            let changed = false;
+            Object.keys(fleetData || {}).forEach(key => {
+                if (fleetAirlineHasRegistrations(key)) return;
+                // Keep a brand-new empty airline while it is selected for editing.
+                if (selectedFleetAirline && airlinesMatch(selectedFleetAirline, key)) return;
+                delete fleetData[key];
+                if (fleetViewOverrides && Object.prototype.hasOwnProperty.call(fleetViewOverrides, key)) {
+                    delete fleetViewOverrides[key];
+                }
+                changed = true;
+            });
+            if (changed) {
+                saveFleetData();
+                saveFleetViewOverrides();
+            }
+            return changed;
+        }
+
         function getLoadedAirlines() {
             const byNorm = new Map();
             const addAirline = (name) => {
@@ -2048,7 +2073,13 @@
                     aircraft.history.forEach(item => addAirline(item.operator));
                 }
             });
-            Object.keys(fleetData || {}).forEach(addAirline);
+            // Only keep fleet airlines that still have at least one registration
+            // (drops leftover misspellings / empty keys after corrections).
+            Object.keys(fleetData || {}).forEach(name => {
+                if (fleetAirlineHasRegistrations(name)) addAirline(name);
+            });
+            // Allow a newly added empty airline to stay visible while selected.
+            if (selectedFleetAirline) addAirline(selectedFleetAirline);
             return Array.from(byNorm.values()).sort((a, b) => a.localeCompare(b));
         }
 
@@ -2462,6 +2493,10 @@
             if (fleetAirlineInput) {
                 fleetAirlineInput.value = next;
             }
+            // Drop empty leftover airline keys once they are no longer selected.
+            if (previous && !airlinesMatch(previous, next)) {
+                pruneEmptyFleetAirlines();
+            }
             closeFleetAirlineList();
             syncComboboxClearButton(fleetAirlineInput, fleetAirlineClear);
             syncFleetAirlineControls();
@@ -2610,6 +2645,7 @@
 
         function populateFleetAirlineSelect() {
             if (!fleetAirlineInput) return;
+            pruneEmptyFleetAirlines();
             const previous = selectedFleetAirline || fleetAirlineInput.value;
             fleetAirlineOptions = getLoadedAirlines();
             if (previous && fleetAirlineOptions.some(a => airlinesMatch(a, previous))) {
@@ -2683,10 +2719,16 @@
             }
             fleetViewOverrides[airlineKey][regKey] = nextView;
 
-            ensureFleetAirlineArray(airline).forEach(entry => {
-                if (normalizeRegistrationKey(entry.registration) !== regKey) return;
-                entry.view = nextView;
-            });
+            // Update existing manual fleet rows only — do not create empty airline keys.
+            const existingKey = Object.keys(fleetData || {}).find(k =>
+                airlinesMatch(k, airlineKey) && Array.isArray(fleetData[k])
+            );
+            if (existingKey) {
+                fleetData[existingKey].forEach(entry => {
+                    if (normalizeRegistrationKey(entry.registration) !== regKey) return;
+                    entry.view = nextView;
+                });
+            }
 
             const pendingIdx = findSeenNotLoggedIndex(airline, registration);
             if (pendingIdx >= 0) {
@@ -2976,6 +3018,14 @@
                 return entryView !== view;
             });
             saveFleetData();
+            if (!fleetAirlineHasRegistrations(key) && selectedFleetAirline && airlinesMatch(selectedFleetAirline, key)) {
+                // Allow prune to remove this airline now that it has no registrations.
+                selectedFleetAirline = '';
+                if (fleetAirlineInput) fleetAirlineInput.value = '';
+                setFleetEditMode(false);
+            }
+            pruneEmptyFleetAirlines();
+            populateFleetAirlineSelect();
             renderFleetUpdateManualList();
             renderFleetList();
         }
@@ -3426,7 +3476,7 @@
             return Array.from(historyContainer.querySelectorAll('.seen-checkbox')).some(cb => cb.checked);
         }
 
-        function syncSightingsSection(formRoot = null, scrollIntoView = false) {
+        function syncSightingsSection(formRoot = null, scrollIntoView = false, autoAdd = true) {
             const ui = getLogFormSightingsUI(formRoot);
             if (!ui.section || !ui.container) return;
 
@@ -3440,12 +3490,17 @@
             }
 
             const hasRows = ui.container.querySelectorAll('.history-item').length > 0;
-            const show = seen || hasRows;
-            ui.section.classList.toggle('hidden', !show);
-            if (seen && !ui.container.querySelector('.history-item')) {
+            // Only auto-add an empty sighting row when the user explicitly marks Seen
+            // (not when merely opening/editing an existing log that already has Seen checked).
+            if (autoAdd && seen && !hasRows) {
                 if (formRoot) addSightingItemRandom('', '', true, formRoot);
                 else addSightingItem('', '', true);
             }
+            const hasRowsAfter = ui.container.querySelectorAll('.history-item').length > 0;
+            // Hide empty sightings on edit load (Seen already on, no rows yet).
+            // Show after an explicit Seen click (autoAdd) or when rows exist.
+            const show = hasRowsAfter || (seen && autoAdd);
+            ui.section.classList.toggle('hidden', !show);
             if (scrollIntoView && seen) {
                 ui.section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
@@ -3805,7 +3860,8 @@
         }
         function resetSightingItems() {
             sightingsContainer.innerHTML = '';
-            syncSightingsSection();
+            // Do not auto-create a sighting while clearing/loading the form.
+            syncSightingsSection(null, false, false);
         }
         
         function getStatus(aircraft) {
@@ -4812,7 +4868,8 @@
                     addSightingItem(sighting.location, sighting.date, i === 0);
                 });
             }
-            syncSightingsSection();
+            // Keep existing sightings only; do not invent a new dated sighting on edit load.
+            syncSightingsSection(null, false, false);
             // Fill flight details if flown
             flownCheckbox.checked = aircraft.flown;
             toggleFlightDetails();
@@ -4928,6 +4985,8 @@
                     importedParts.push('seenNotLogged');
                 }
             }
+
+            pruneEmptyFleetAirlines();
 
             return {
                 aircraftCount: aircraftData.length,
@@ -5174,7 +5233,8 @@
                     addSightingItemRandom(sighting.location, sighting.date, i === 0, wrapper);
                 });
             }
-            syncSightingsSection(wrapper);
+            // Keep existing sightings only; do not invent a new dated sighting on review load.
+            syncSightingsSection(wrapper, false, false);
             // Flown
             wrapper.querySelector('#flown_random').checked = aircraft.flown;
             // Show/hide flight details
