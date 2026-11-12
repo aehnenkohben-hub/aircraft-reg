@@ -936,9 +936,100 @@
             margin-bottom: 0.25rem;
         }
 
-        .fleet-panel-controls select,
         .fleet-panel-controls .search-input {
             margin-bottom: 0;
+        }
+
+        .fleet-airline-combobox {
+            position: relative;
+        }
+
+        .fleet-airline-control {
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm, 6px);
+            background: var(--surface-elevated, #fff);
+            overflow: hidden;
+        }
+
+        .fleet-airline-control:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
+        }
+
+        .fleet-airline-control input {
+            flex: 1;
+            min-width: 0;
+            margin: 0 !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background: transparent;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.9375rem;
+        }
+
+        .fleet-airline-toggle {
+            flex: 0 0 auto;
+            width: 2.5rem;
+            margin: 0;
+            padding: 0;
+            border: none;
+            border-left: 1px solid var(--border);
+            background: var(--surface-muted, #f5f5f7);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.75rem;
+            line-height: 1;
+        }
+
+        .fleet-airline-toggle:hover {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        .fleet-airline-listbox {
+            position: absolute;
+            z-index: 30;
+            left: 0;
+            right: 0;
+            top: calc(100% + 4px);
+            max-height: 16rem;
+            overflow-y: auto;
+            margin: 0;
+            padding: 0.25rem 0;
+            list-style: none;
+            background: var(--surface-elevated, #fff);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm, 6px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .fleet-airline-listbox.hidden {
+            display: none;
+        }
+
+        .fleet-airline-option {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            font-size: 0.9375rem;
+        }
+
+        .fleet-airline-option:hover,
+        .fleet-airline-option.is-active {
+            background: color-mix(in srgb, var(--primary) 12%, transparent);
+        }
+
+        .fleet-airline-option.is-selected {
+            font-weight: 600;
+        }
+
+        .fleet-airline-empty {
+            padding: 0.65rem 0.75rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
         }
 
         .fleet-toolbar {
@@ -1302,11 +1393,24 @@
         </div>
         <div id="landingPanelFleets" class="landing-tab-panel hidden" role="tabpanel" aria-labelledby="landingTabFleets" hidden>
             <div class="fleet-panel-controls">
-                <div>
-                    <label for="fleetAirlineSelect">Airline</label>
-                    <select id="fleetAirlineSelect" aria-label="Select airline">
-                        <option value="">Select an airline…</option>
-                    </select>
+                <div class="fleet-airline-combobox" id="fleetAirlineCombobox">
+                    <label for="fleetAirlineInput">Airline</label>
+                    <div class="fleet-airline-control">
+                        <input
+                            type="text"
+                            id="fleetAirlineInput"
+                            role="combobox"
+                            aria-autocomplete="list"
+                            aria-expanded="false"
+                            aria-controls="fleetAirlineListbox"
+                            aria-label="Search or select airline"
+                            placeholder="Search or select airline…"
+                            autocomplete="off"
+                            spellcheck="false"
+                        />
+                        <button type="button" class="fleet-airline-toggle" id="fleetAirlineToggle" aria-label="Show airline list">▾</button>
+                    </div>
+                    <ul id="fleetAirlineListbox" class="fleet-airline-listbox hidden" role="listbox" aria-label="Airlines"></ul>
                 </div>
                 <div>
                     <label for="fleetRegSearch">Search registrations</label>
@@ -1550,7 +1654,9 @@
         const landingPanelLog = document.getElementById('landingPanelLog');
         const landingPanelFleets = document.getElementById('landingPanelFleets');
         const landingPanelTools = document.getElementById('landingPanelTools');
-        const fleetAirlineSelect = document.getElementById('fleetAirlineSelect');
+        const fleetAirlineInput = document.getElementById('fleetAirlineInput');
+        const fleetAirlineListbox = document.getElementById('fleetAirlineListbox');
+        const fleetAirlineToggle = document.getElementById('fleetAirlineToggle');
         const fleetEditBtn = document.getElementById('fleetEditBtn');
         const fleetSummary = document.getElementById('fleetSummary');
         const fleetEditPanel = document.getElementById('fleetEditPanel');
@@ -1571,6 +1677,9 @@
         let seenNotLogged = []; // [{ registration, airline, view, markedAt }]
         let fleetEditMode = false;
         let fleetView = 'active'; // 'active' | 'historic'
+        let fleetAirlineOptions = [];
+        let selectedFleetAirline = '';
+        let fleetAirlineHighlightIndex = -1;
         
         // ========== INITIALIZATION FUNCTIONS ==========
         function init() {
@@ -1703,13 +1812,7 @@
             if (landingTabLog) landingTabLog.addEventListener('click', () => setLandingTab('log'));
             if (landingTabFleets) landingTabFleets.addEventListener('click', () => setLandingTab('fleets'));
             if (landingTabTools) landingTabTools.addEventListener('click', () => setLandingTab('tools'));
-            if (fleetAirlineSelect) {
-                fleetAirlineSelect.addEventListener('change', () => {
-                    setFleetEditMode(false);
-                    if (fleetRegSearch) fleetRegSearch.value = '';
-                    renderFleetList();
-                });
-            }
+            setupFleetAirlineCombobox();
             if (fleetRegSearch) {
                 fleetRegSearch.addEventListener('input', () => renderFleetList());
             }
@@ -1887,10 +1990,204 @@
         }
 
         function getSelectedFleetAirline() {
-            return fleetAirlineSelect ? fleetAirlineSelect.value.trim() : '';
+            return (selectedFleetAirline || '').trim();
         }
 
-            function setFleetView(view) {
+        function syncFleetAirlineControls() {
+            const hasAirline = !!getSelectedFleetAirline();
+            if (fleetEditBtn) fleetEditBtn.disabled = !hasAirline;
+            if (fleetSubtabActive) fleetSubtabActive.disabled = !hasAirline;
+            if (fleetSubtabHistoric) fleetSubtabHistoric.disabled = !hasAirline;
+            if (fleetRegSearch) fleetRegSearch.disabled = !hasAirline;
+        }
+
+        function onFleetAirlineSelectionChanged() {
+            setFleetEditMode(false);
+            if (fleetRegSearch) fleetRegSearch.value = '';
+            syncFleetAirlineControls();
+            renderFleetList();
+        }
+
+        function getFilteredFleetAirlines(query) {
+            const q = (query || '').trim().toLowerCase();
+            if (!q) return fleetAirlineOptions.slice();
+            return fleetAirlineOptions.filter(name => name.toLowerCase().includes(q));
+        }
+
+        function isFleetAirlineListOpen() {
+            return !!(fleetAirlineListbox && !fleetAirlineListbox.classList.contains('hidden'));
+        }
+
+        function closeFleetAirlineList() {
+            if (!fleetAirlineListbox || !fleetAirlineInput) return;
+            fleetAirlineListbox.classList.add('hidden');
+            fleetAirlineInput.setAttribute('aria-expanded', 'false');
+            fleetAirlineHighlightIndex = -1;
+        }
+
+        function openFleetAirlineList(filterText) {
+            if (!fleetAirlineListbox || !fleetAirlineInput) return;
+            renderFleetAirlineListbox(filterText !== undefined ? filterText : fleetAirlineInput.value);
+            fleetAirlineListbox.classList.remove('hidden');
+            fleetAirlineInput.setAttribute('aria-expanded', 'true');
+        }
+
+        function renderFleetAirlineListbox(filterText) {
+            if (!fleetAirlineListbox) return;
+            const matches = getFilteredFleetAirlines(filterText);
+            fleetAirlineListbox.innerHTML = '';
+
+            if (!matches.length) {
+                const empty = document.createElement('li');
+                empty.className = 'fleet-airline-empty';
+                empty.textContent = fleetAirlineOptions.length
+                    ? 'No airlines match.'
+                    : 'No airlines yet — log an aircraft first.';
+                fleetAirlineListbox.appendChild(empty);
+                fleetAirlineHighlightIndex = -1;
+                return;
+            }
+
+            if (fleetAirlineHighlightIndex >= matches.length) {
+                fleetAirlineHighlightIndex = matches.length - 1;
+            }
+
+            matches.forEach((name, index) => {
+                const option = document.createElement('li');
+                option.className = 'fleet-airline-option';
+                option.setAttribute('role', 'option');
+                option.id = `fleetAirlineOption_${index}`;
+                option.dataset.value = name;
+                option.textContent = name;
+                if (selectedFleetAirline && airlinesMatch(selectedFleetAirline, name)) {
+                    option.classList.add('is-selected');
+                    option.setAttribute('aria-selected', 'true');
+                } else {
+                    option.setAttribute('aria-selected', 'false');
+                }
+                if (index === fleetAirlineHighlightIndex) {
+                    option.classList.add('is-active');
+                }
+                option.addEventListener('mousedown', (event) => {
+                    event.preventDefault();
+                    selectFleetAirline(name);
+                });
+                fleetAirlineListbox.appendChild(option);
+            });
+
+            if (fleetAirlineInput) {
+                const active = fleetAirlineListbox.querySelector('.fleet-airline-option.is-active');
+                fleetAirlineInput.setAttribute(
+                    'aria-activedescendant',
+                    active ? active.id : ''
+                );
+            }
+        }
+
+        function selectFleetAirline(name, options = {}) {
+            const next = (name || '').trim();
+            const previous = selectedFleetAirline;
+            selectedFleetAirline = next;
+            if (fleetAirlineInput) {
+                fleetAirlineInput.value = next;
+            }
+            closeFleetAirlineList();
+            syncFleetAirlineControls();
+            if (!options.silent && !airlinesMatch(previous, next)) {
+                onFleetAirlineSelectionChanged();
+            } else if (options.silent) {
+                syncFleetAirlineControls();
+            }
+        }
+
+        function setupFleetAirlineCombobox() {
+            if (!fleetAirlineInput || !fleetAirlineListbox) return;
+
+            fleetAirlineInput.addEventListener('focus', () => {
+                openFleetAirlineList(fleetAirlineInput.value);
+            });
+
+            fleetAirlineInput.addEventListener('input', () => {
+                fleetAirlineHighlightIndex = 0;
+                openFleetAirlineList(fleetAirlineInput.value);
+            });
+
+            fleetAirlineInput.addEventListener('keydown', (event) => {
+                const matches = getFilteredFleetAirlines(fleetAirlineInput.value);
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    if (!isFleetAirlineListOpen()) openFleetAirlineList(fleetAirlineInput.value);
+                    fleetAirlineHighlightIndex = Math.min(
+                        matches.length - 1,
+                        Math.max(0, fleetAirlineHighlightIndex + 1)
+                    );
+                    renderFleetAirlineListbox(fleetAirlineInput.value);
+                    const active = fleetAirlineListbox.querySelector('.fleet-airline-option.is-active');
+                    if (active) active.scrollIntoView({ block: 'nearest' });
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    if (!isFleetAirlineListOpen()) openFleetAirlineList(fleetAirlineInput.value);
+                    fleetAirlineHighlightIndex = Math.max(0, fleetAirlineHighlightIndex <= 0 ? 0 : fleetAirlineHighlightIndex - 1);
+                    renderFleetAirlineListbox(fleetAirlineInput.value);
+                    const active = fleetAirlineListbox.querySelector('.fleet-airline-option.is-active');
+                    if (active) active.scrollIntoView({ block: 'nearest' });
+                } else if (event.key === 'Enter') {
+                    if (!isFleetAirlineListOpen()) return;
+                    event.preventDefault();
+                    const pick = matches[fleetAirlineHighlightIndex] || matches[0];
+                    if (pick) selectFleetAirline(pick);
+                } else if (event.key === 'Escape') {
+                    if (isFleetAirlineListOpen()) {
+                        event.preventDefault();
+                        closeFleetAirlineList();
+                        fleetAirlineInput.value = selectedFleetAirline;
+                    }
+                }
+            });
+
+            fleetAirlineInput.addEventListener('blur', () => {
+                setTimeout(() => {
+                    if (!fleetAirlineListbox.contains(document.activeElement) && document.activeElement !== fleetAirlineToggle) {
+                        closeFleetAirlineList();
+                        const typed = fleetAirlineInput.value.trim();
+                        if (!typed) {
+                            if (selectedFleetAirline) selectFleetAirline('', { silent: false });
+                            else fleetAirlineInput.value = '';
+                            return;
+                        }
+                        const exact = fleetAirlineOptions.find(a => airlinesMatch(a, typed));
+                        if (exact) {
+                            selectFleetAirline(exact);
+                        } else {
+                            fleetAirlineInput.value = selectedFleetAirline;
+                        }
+                    }
+                }, 120);
+            });
+
+            if (fleetAirlineToggle) {
+                fleetAirlineToggle.addEventListener('mousedown', (event) => {
+                    event.preventDefault();
+                });
+                fleetAirlineToggle.addEventListener('click', () => {
+                    if (isFleetAirlineListOpen()) {
+                        closeFleetAirlineList();
+                        return;
+                    }
+                    fleetAirlineInput.focus();
+                    fleetAirlineHighlightIndex = 0;
+                    openFleetAirlineList('');
+                });
+            }
+
+            document.addEventListener('click', (event) => {
+                const combobox = document.getElementById('fleetAirlineCombobox');
+                if (!combobox || combobox.contains(event.target)) return;
+                closeFleetAirlineList();
+            });
+        }
+
+        function setFleetView(view) {
             fleetView = view === 'historic' ? 'historic' : 'active';
             if (fleetSubtabActive && fleetSubtabHistoric) {
                 const activeSelected = fleetView === 'active';
@@ -1906,32 +2203,31 @@
         }
 
         function populateFleetAirlineSelect() {
-            if (!fleetAirlineSelect) return;
-            const previous = fleetAirlineSelect.value;
-            const airlines = getLoadedAirlines();
-            fleetAirlineSelect.innerHTML = '<option value="">Select an airline…</option>';
-            airlines.forEach(name => {
-                const option = document.createElement('option');
-                option.value = name;
-                option.textContent = name;
-                fleetAirlineSelect.appendChild(option);
-            });
-            if (previous && airlines.some(a => airlinesMatch(a, previous))) {
-                const match = airlines.find(a => airlinesMatch(a, previous)) || previous;
-                fleetAirlineSelect.value = match;
+            if (!fleetAirlineInput) return;
+            const previous = selectedFleetAirline || fleetAirlineInput.value;
+            fleetAirlineOptions = getLoadedAirlines();
+            if (previous && fleetAirlineOptions.some(a => airlinesMatch(a, previous))) {
+                const match = fleetAirlineOptions.find(a => airlinesMatch(a, previous)) || previous;
+                selectedFleetAirline = match;
+                fleetAirlineInput.value = match;
+            } else if (previous && !fleetAirlineOptions.some(a => airlinesMatch(a, previous))) {
+                selectedFleetAirline = '';
+                fleetAirlineInput.value = '';
+            } else if (selectedFleetAirline) {
+                fleetAirlineInput.value = selectedFleetAirline;
             }
-            const hasAirline = !!fleetAirlineSelect.value;
-            if (fleetEditBtn) fleetEditBtn.disabled = !hasAirline;
-            if (fleetSubtabActive) fleetSubtabActive.disabled = !hasAirline;
-            if (fleetSubtabHistoric) fleetSubtabHistoric.disabled = !hasAirline;
+            syncFleetAirlineControls();
+            if (isFleetAirlineListOpen()) {
+                renderFleetAirlineListbox(fleetAirlineInput.value);
+            }
         }
 
         function setFleetEditMode(enabled) {
-            fleetEditMode = !!enabled && !!(fleetAirlineSelect && fleetAirlineSelect.value);
+            fleetEditMode = !!enabled && !!getSelectedFleetAirline();
             if (fleetEditPanel) fleetEditPanel.classList.toggle('hidden', !fleetEditMode);
             if (fleetEditBtn) {
                 fleetEditBtn.textContent = fleetEditMode ? 'Updating…' : 'Update fleet';
-                fleetEditBtn.disabled = !(fleetAirlineSelect && fleetAirlineSelect.value);
+                fleetEditBtn.disabled = !getSelectedFleetAirline();
             }
             if (!fleetEditMode && fleetAddRegs) fleetAddRegs.value = '';
             if (fleetEditMode) {
