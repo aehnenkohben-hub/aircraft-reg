@@ -990,9 +990,12 @@
 
         .fleet-airline-toggle,
         .fleet-reg-toggle,
-        .history-operator-toggle {
+        .history-operator-toggle,
+        .fleet-airline-clear,
+        .fleet-reg-clear,
+        .history-operator-clear {
             flex: 0 0 auto;
-            width: 2.5rem;
+            width: 2.25rem;
             margin: 0;
             padding: 0;
             border: none;
@@ -1000,15 +1003,31 @@
             background: var(--surface-muted, #f5f5f7);
             color: var(--text-secondary);
             cursor: pointer;
-            font-size: 0.75rem;
+            font-size: 0.85rem;
             line-height: 1;
+        }
+
+        .fleet-airline-toggle,
+        .fleet-reg-toggle,
+        .history-operator-toggle {
+            width: 2.5rem;
+            font-size: 0.75rem;
         }
 
         .fleet-airline-toggle:hover,
         .fleet-reg-toggle:hover,
-        .history-operator-toggle:hover {
+        .history-operator-toggle:hover,
+        .fleet-airline-clear:hover,
+        .fleet-reg-clear:hover,
+        .history-operator-clear:hover {
             background: var(--border);
             color: var(--text);
+        }
+
+        .fleet-airline-clear.hidden,
+        .fleet-reg-clear.hidden,
+        .history-operator-clear.hidden {
+            display: none;
         }
 
         .fleet-airline-listbox,
@@ -1077,7 +1096,8 @@
         }
 
         .fleet-reg-control input:disabled,
-        .fleet-reg-toggle:disabled {
+        .fleet-reg-toggle:disabled,
+        .fleet-reg-clear:disabled {
             opacity: 0.55;
             cursor: not-allowed;
         }
@@ -1458,6 +1478,7 @@
                             autocomplete="off"
                             spellcheck="false"
                         />
+                        <button type="button" class="fleet-airline-clear hidden" id="fleetAirlineClear" aria-label="Clear airline">×</button>
                         <button type="button" class="fleet-airline-toggle" id="fleetAirlineToggle" aria-label="Show airline list">▾</button>
                     </div>
                     <ul id="fleetAirlineListbox" class="fleet-airline-listbox hidden" role="listbox" aria-label="Airlines"></ul>
@@ -1479,6 +1500,7 @@
                             spellcheck="false"
                             disabled
                         />
+                        <button type="button" class="fleet-reg-clear hidden" id="fleetRegClear" aria-label="Clear registration search" disabled>×</button>
                         <button type="button" class="fleet-reg-toggle" id="fleetRegToggle" aria-label="Show registration list" disabled>▾</button>
                     </div>
                     <ul id="fleetRegListbox" class="fleet-reg-listbox hidden" role="listbox" aria-label="Registrations"></ul>
@@ -1724,6 +1746,7 @@
         const fleetAirlineInput = document.getElementById('fleetAirlineInput');
         const fleetAirlineListbox = document.getElementById('fleetAirlineListbox');
         const fleetAirlineToggle = document.getElementById('fleetAirlineToggle');
+        const fleetAirlineClear = document.getElementById('fleetAirlineClear');
         const fleetEditBtn = document.getElementById('fleetEditBtn');
         const fleetSummary = document.getElementById('fleetSummary');
         const fleetEditPanel = document.getElementById('fleetEditPanel');
@@ -1736,8 +1759,15 @@
         const fleetRegSearch = document.getElementById('fleetRegSearch');
         const fleetRegListbox = document.getElementById('fleetRegListbox');
         const fleetRegToggle = document.getElementById('fleetRegToggle');
+        const fleetRegClear = document.getElementById('fleetRegClear');
         const fleetList = document.getElementById('fleetList');
         let fleetRegHighlightIndex = -1;
+
+        function syncComboboxClearButton(input, clearBtn) {
+            if (!clearBtn) return;
+            const hasText = !!(input && input.value && input.value.trim());
+            clearBtn.classList.toggle('hidden', !hasText);
+        }
         const seenNotLoggedList = document.getElementById('seenNotLoggedList');
         
         // ========== DATA STORAGE ==========
@@ -2068,13 +2098,17 @@
             if (fleetSubtabHistoric) fleetSubtabHistoric.disabled = !hasAirline;
             if (fleetRegSearch) fleetRegSearch.disabled = !hasAirline;
             if (fleetRegToggle) fleetRegToggle.disabled = !hasAirline;
+            if (fleetRegClear) fleetRegClear.disabled = !hasAirline;
             if (!hasAirline) closeFleetRegList();
+            syncComboboxClearButton(fleetAirlineInput, fleetAirlineClear);
+            syncComboboxClearButton(fleetRegSearch, fleetRegClear);
         }
 
         function onFleetAirlineSelectionChanged() {
             setFleetEditMode(false);
             if (fleetRegSearch) fleetRegSearch.value = '';
             closeFleetRegList();
+            syncComboboxClearButton(fleetRegSearch, fleetRegClear);
             syncFleetAirlineControls();
             renderFleetList();
         }
@@ -2184,10 +2218,12 @@
                 const result = addSingleFleetRegistration(item.name);
                 if (result.added) {
                     if (fleetRegSearch) fleetRegSearch.value = result.registration;
+                    syncComboboxClearButton(fleetRegSearch, fleetRegClear);
                     closeFleetRegList();
                     renderFleetList();
                 } else if (result.reason === 'duplicate') {
                     if (fleetRegSearch) fleetRegSearch.value = result.registration;
+                    syncComboboxClearButton(fleetRegSearch, fleetRegClear);
                     closeFleetRegList();
                     renderFleetList();
                     alert(`${result.registration} is already on this list.`);
@@ -2195,6 +2231,7 @@
                 return;
             }
             if (fleetRegSearch) fleetRegSearch.value = item.name;
+            syncComboboxClearButton(fleetRegSearch, fleetRegClear);
             closeFleetRegList();
             renderFleetList();
         }
@@ -2226,6 +2263,8 @@
         function setupFleetRegCombobox() {
             if (!fleetRegSearch || !fleetRegListbox) return;
 
+            syncComboboxClearButton(fleetRegSearch, fleetRegClear);
+
             fleetRegSearch.addEventListener('focus', () => {
                 if (fleetRegSearch.disabled) return;
                 openFleetRegList(fleetRegSearch.value);
@@ -2235,6 +2274,7 @@
                 fleetRegSearch.value = fleetRegSearch.value.toUpperCase();
                 fleetRegHighlightIndex = 0;
                 openFleetRegList(fleetRegSearch.value);
+                syncComboboxClearButton(fleetRegSearch, fleetRegClear);
                 renderFleetList();
             });
 
@@ -2271,10 +2311,26 @@
 
             fleetRegSearch.addEventListener('blur', () => {
                 setTimeout(() => {
-                    if (fleetRegListbox.contains(document.activeElement) || document.activeElement === fleetRegToggle) return;
+                    if (
+                        fleetRegListbox.contains(document.activeElement) ||
+                        document.activeElement === fleetRegToggle ||
+                        document.activeElement === fleetRegClear
+                    ) return;
                     closeFleetRegList();
                 }, 120);
             });
+
+            if (fleetRegClear) {
+                fleetRegClear.addEventListener('mousedown', (event) => event.preventDefault());
+                fleetRegClear.addEventListener('click', () => {
+                    if (fleetRegClear.disabled) return;
+                    fleetRegSearch.value = '';
+                    syncComboboxClearButton(fleetRegSearch, fleetRegClear);
+                    closeFleetRegList();
+                    renderFleetList();
+                    fleetRegSearch.focus();
+                });
+            }
 
             if (fleetRegToggle) {
                 fleetRegToggle.addEventListener('mousedown', (event) => event.preventDefault());
@@ -2407,6 +2463,7 @@
                 fleetAirlineInput.value = next;
             }
             closeFleetAirlineList();
+            syncComboboxClearButton(fleetAirlineInput, fleetAirlineClear);
             syncFleetAirlineControls();
             if (!options.silent && !airlinesMatch(previous, next)) {
                 onFleetAirlineSelectionChanged();
@@ -2433,6 +2490,8 @@
         function setupFleetAirlineCombobox() {
             if (!fleetAirlineInput || !fleetAirlineListbox) return;
 
+            syncComboboxClearButton(fleetAirlineInput, fleetAirlineClear);
+
             fleetAirlineInput.addEventListener('focus', () => {
                 openFleetAirlineList(fleetAirlineInput.value);
             });
@@ -2440,6 +2499,7 @@
             fleetAirlineInput.addEventListener('input', () => {
                 fleetAirlineHighlightIndex = 0;
                 openFleetAirlineList(fleetAirlineInput.value);
+                syncComboboxClearButton(fleetAirlineInput, fleetAirlineClear);
             });
 
             fleetAirlineInput.addEventListener('keydown', (event) => {
@@ -2471,18 +2531,24 @@
                         event.preventDefault();
                         closeFleetAirlineList();
                         fleetAirlineInput.value = selectedFleetAirline;
+                        syncComboboxClearButton(fleetAirlineInput, fleetAirlineClear);
                     }
                 }
             });
 
             fleetAirlineInput.addEventListener('blur', () => {
                 setTimeout(() => {
-                    if (!fleetAirlineListbox.contains(document.activeElement) && document.activeElement !== fleetAirlineToggle) {
+                    if (
+                        !fleetAirlineListbox.contains(document.activeElement) &&
+                        document.activeElement !== fleetAirlineToggle &&
+                        document.activeElement !== fleetAirlineClear
+                    ) {
                         closeFleetAirlineList();
                         const typed = fleetAirlineInput.value.trim();
                         if (!typed) {
                             if (selectedFleetAirline) selectFleetAirline('', { silent: false });
                             else fleetAirlineInput.value = '';
+                            syncComboboxClearButton(fleetAirlineInput, fleetAirlineClear);
                             return;
                         }
                         const exact = fleetAirlineOptions.find(a => airlinesMatch(a, typed));
@@ -2491,10 +2557,19 @@
                         } else {
                             // Keep typed text visible only while choosing; require explicit Add/Enter to create.
                             fleetAirlineInput.value = selectedFleetAirline;
+                            syncComboboxClearButton(fleetAirlineInput, fleetAirlineClear);
                         }
                     }
                 }, 120);
             });
+
+            if (fleetAirlineClear) {
+                fleetAirlineClear.addEventListener('mousedown', (event) => event.preventDefault());
+                fleetAirlineClear.addEventListener('click', () => {
+                    selectFleetAirline('');
+                    fleetAirlineInput.focus();
+                });
+            }
 
             if (fleetAirlineToggle) {
                 fleetAirlineToggle.addEventListener('mousedown', (event) => {
@@ -2547,6 +2622,7 @@
             } else if (selectedFleetAirline) {
                 fleetAirlineInput.value = selectedFleetAirline;
             }
+            syncComboboxClearButton(fleetAirlineInput, fleetAirlineClear);
             syncFleetAirlineControls();
             if (isFleetAirlineListOpen()) {
                 renderFleetAirlineListbox(fleetAirlineInput.value);
@@ -2981,7 +3057,9 @@
                 if (!hasAirline) fleetRegSearch.value = '';
             }
             if (fleetRegToggle) fleetRegToggle.disabled = !hasAirline;
+            if (fleetRegClear) fleetRegClear.disabled = !hasAirline;
             if (!hasAirline) closeFleetRegList();
+            syncComboboxClearButton(fleetRegSearch, fleetRegClear);
 
             if (!hasAirline) {
                 fleetList.innerHTML = '<p class="fleet-empty">Choose an airline to view active and historic registrations.</p>';
@@ -3378,6 +3456,7 @@
         function buildHistoryOperatorComboboxHtml(operator) {
             const seq = ++historyOperatorComboSeq;
             const listId = `historyOperatorList_${seq}`;
+            const hasValue = !!(operator || '').trim();
             return `
                 <div class="history-operator-combobox">
                     <div class="history-operator-control">
@@ -3385,6 +3464,7 @@
                             aria-expanded="false" aria-controls="${listId}" aria-label="Search or add operator"
                             placeholder="Search or add operator…" value="${escapeHtml(operator || '')}"
                             autocomplete="off" spellcheck="false">
+                        <button type="button" class="history-operator-clear${hasValue ? '' : ' hidden'}" aria-label="Clear operator">×</button>
                         <button type="button" class="history-operator-toggle" aria-label="Show operators" tabindex="-1">▾</button>
                     </div>
                     <ul id="${listId}" class="history-operator-listbox hidden" role="listbox" aria-label="Operators"></ul>
@@ -3396,10 +3476,15 @@
             const input = historyItem.querySelector('.history-operator');
             const listbox = historyItem.querySelector('.history-operator-listbox');
             const toggle = historyItem.querySelector('.history-operator-toggle');
+            const clearBtn = historyItem.querySelector('.history-operator-clear');
             if (!input || !listbox) return;
 
             let selected = (input.value || '').trim();
             let highlightIndex = -1;
+
+            function syncClear() {
+                syncComboboxClearButton(input, clearBtn);
+            }
 
             function getOptions() {
                 return getLoadedAirlines();
@@ -3482,6 +3567,7 @@
                 selected = (name || '').trim();
                 input.value = selected;
                 close();
+                syncClear();
             }
 
             function choose(item) {
@@ -3503,10 +3589,12 @@
                 commit(item.name);
             }
 
+            syncClear();
             input.addEventListener('focus', () => open(input.value));
             input.addEventListener('input', () => {
                 highlightIndex = 0;
                 open(input.value);
+                syncClear();
             });
             input.addEventListener('keydown', (event) => {
                 const items = getItems(input.value);
@@ -3532,24 +3620,44 @@
                         event.preventDefault();
                         close();
                         input.value = selected;
+                        syncClear();
                     }
                 }
             });
             input.addEventListener('blur', () => {
                 setTimeout(() => {
-                    if (listbox.contains(document.activeElement) || document.activeElement === toggle) return;
+                    if (
+                        listbox.contains(document.activeElement) ||
+                        document.activeElement === toggle ||
+                        document.activeElement === clearBtn
+                    ) return;
                     close();
                     const typed = input.value.trim();
                     if (!typed) {
                         selected = '';
                         input.value = '';
+                        syncClear();
                         return;
                     }
                     const exact = getOptions().find(a => airlinesMatch(a, typed));
                     if (exact) commit(exact);
-                    else input.value = selected;
+                    else {
+                        input.value = selected;
+                        syncClear();
+                    }
                 }, 120);
             });
+
+            if (clearBtn) {
+                clearBtn.addEventListener('mousedown', (event) => event.preventDefault());
+                clearBtn.addEventListener('click', () => {
+                    selected = '';
+                    input.value = '';
+                    syncClear();
+                    close();
+                    input.focus();
+                });
+            }
 
             if (toggle) {
                 toggle.addEventListener('mousedown', (event) => event.preventDefault());
