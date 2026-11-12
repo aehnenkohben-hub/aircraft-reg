@@ -2549,7 +2549,7 @@
                     registration: (registration || '').trim().toUpperCase(),
                     airline: (airline || '').trim(),
                     view: view === 'historic' ? 'historic' : 'active',
-                    markedAt: new Date().toISOString()
+                    markedAt: todayDateInputValue()
                 });
             }
             saveSeenNotLogged();
@@ -2574,6 +2574,10 @@
             const operator = (airline || '').trim();
             if (!reg || !operator) return;
 
+            const pendingIdx = findSeenNotLoggedIndex(operator, reg);
+            const pending = pendingIdx >= 0 ? seenNotLogged[pendingIdx] : null;
+            const seenDate = toDateInputValue(pending?.markedAt);
+
             window._returnToFleetsAfterEdit = !options.fromTools;
             window._returnToToolsAfterEdit = !!options.fromTools;
             window._pendingSeenNotLogged = { registration: reg, airline: operator };
@@ -2585,9 +2589,11 @@
 
             resetHistoryItems();
             const isActiveFleet = view !== 'historic';
-            addHistoryItem(reg, operator, true, false);
+            addHistoryItem(reg, operator, true, true);
             inServiceCheckbox.checked = isActiveFleet;
             toggleOutOfServiceSection();
+            sightingsContainer.innerHTML = '';
+            addSightingItem('', seenDate, true);
             syncSightingsSection();
             hideLookupPicker(createMainFormLookupContext());
             setLookupStatus(document.getElementById('regLookupStatus'), '', null);
@@ -2645,10 +2651,13 @@
                 const row = document.createElement('div');
                 row.className = 'seen-pending-row';
                 const viewLabel = item.view === 'historic' ? 'Historic' : 'Active';
+                const seenDateLabel = formatSeenMarkedDate(item.markedAt);
+                const metaParts = [item.airline, viewLabel];
+                if (seenDateLabel) metaParts.push(`Seen ${seenDateLabel}`);
                 row.innerHTML = `
                     <div class="seen-pending-info">
                         <span class="seen-pending-reg">${escapeHtml(item.registration)}</span>
-                        <span class="seen-pending-meta">${escapeHtml(item.airline)} · ${viewLabel}</span>
+                        <span class="seen-pending-meta">${escapeHtml(metaParts.join(' · '))}</span>
                     </div>
                     <div class="seen-pending-actions"></div>
                 `;
@@ -2758,6 +2767,30 @@
             const m = String(d.getMonth() + 1).padStart(2, '0');
             const day = String(d.getDate()).padStart(2, '0');
             return `${y}-${m}-${day}`;
+        }
+
+        /** Normalize markedAt (ISO or YYYY-MM-DD) to a date input value. */
+        function toDateInputValue(value) {
+            if (!value) return todayDateInputValue();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return todayDateInputValue();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function formatSeenMarkedDate(value) {
+            if (!value) return '';
+            const dateValue = toDateInputValue(value);
+            const d = new Date(`${dateValue}T12:00:00`);
+            if (Number.isNaN(d.getTime())) return '';
+            return d.toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
         }
 
         function getLogFormSightingsUI(formRoot) {
