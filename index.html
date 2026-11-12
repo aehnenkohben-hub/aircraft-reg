@@ -4006,6 +4006,8 @@
             const currentRow = Array.from(registrationItems).find(item => item.querySelector('.current-reg-checkbox').checked);
             const currentIsSeen = currentRow ? currentRow.querySelector('.seen-checkbox').checked : false;
 
+            const editIndex = parseInt(editIndexInput.value, 10);
+            const previousAircraft = editIndex >= 0 ? aircraftData[editIndex] : null;
             const aircraft = {
                 registration: currentReg,
                 airline: currentOperator,
@@ -4018,10 +4020,9 @@
                 flown: flownCheckbox.checked,
                 trips: trips,
                 sightings: sightings,
-                loggedDate: new Date().toISOString()
+                loggedDate: previousAircraft?.loggedDate || new Date().toISOString()
             };
 
-            const editIndex = parseInt(editIndexInput.value, 10);
             if (editIndex >= 0) {
                 aircraftData[editIndex] = aircraft;
             } else {
@@ -4329,16 +4330,26 @@
             }
         }
         
-        function exportData() {
-            const payload = {
-                version: 2,
+        const USER_DATA_EXPORT_VERSION = 2;
+
+        function isPlainObject(value) {
+            return !!value && typeof value === 'object' && !Array.isArray(value);
+        }
+
+        /** Full local user-data snapshot (log + fleets + overrides + seen-not-logged). */
+        function getUserDataSnapshot() {
+            return {
+                version: USER_DATA_EXPORT_VERSION,
                 exportedAt: new Date().toISOString(),
                 aircraft: aircraftData,
                 fleets: fleetData,
                 fleetViewOverrides: fleetViewOverrides,
                 seenNotLogged: seenNotLogged
             };
-            const dataStr = JSON.stringify(payload, null, 2);
+        }
+
+        function exportData() {
+            const dataStr = JSON.stringify(getUserDataSnapshot(), null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -4355,10 +4366,14 @@
             if (Array.isArray(importedData)) {
                 aircraftData = importedData;
                 saveAircraftData();
-                return { aircraftCount: aircraftData.length, fleetsImported: false };
+                return {
+                    aircraftCount: aircraftData.length,
+                    importedParts: ['aircraft'],
+                    fullSnapshot: false
+                };
             }
 
-            if (!importedData || typeof importedData !== 'object') {
+            if (!isPlainObject(importedData)) {
                 throw new Error('Invalid data format');
             }
 
@@ -4367,27 +4382,81 @@
                 : (Array.isArray(importedData.aircraftData) ? importedData.aircraftData : null);
             if (!aircraft) throw new Error('Invalid data format: missing aircraft list');
 
+            const fleets = isPlainObject(importedData.fleets)
+                ? importedData.fleets
+                : (isPlainObject(importedData.fleetData) ? importedData.fleetData : null);
+            const overrides = isPlainObject(importedData.fleetViewOverrides)
+                ? importedData.fleetViewOverrides
+                : null;
+            const pendingSeen = Array.isArray(importedData.seenNotLogged)
+                ? importedData.seenNotLogged
+                : null;
+
+            const version = Number(importedData.version) || 0;
+            // Versioned backups are complete snapshots — restore every store so nothing is left behind.
+            const fullSnapshot = version >= 2;
+
             aircraftData = aircraft;
             saveAircraftData();
+            const importedParts = ['aircraft'];
 
-            let fleetsImported = false;
-            if (importedData.fleets && typeof importedData.fleets === 'object' && !Array.isArray(importedData.fleets)) {
-                fleetData = importedData.fleets;
+            if (fullSnapshot) {
+                fleetData = fleets || {};
                 saveFleetData();
-                fleetsImported = true;
-            }
-            if (importedData.fleetViewOverrides && typeof importedData.fleetViewOverrides === 'object' && !Array.isArray(importedData.fleetViewOverrides)) {
-                fleetViewOverrides = importedData.fleetViewOverrides;
+                importedParts.push('fleets');
+
+                fleetViewOverrides = overrides || {};
                 saveFleetViewOverrides();
-                fleetsImported = true;
-            }
-            if (Array.isArray(importedData.seenNotLogged)) {
-                seenNotLogged = importedData.seenNotLogged;
+                importedParts.push('fleetViewOverrides');
+
+                seenNotLogged = pendingSeen || [];
                 saveSeenNotLogged();
-                fleetsImported = true;
+                importedParts.push('seenNotLogged');
+            } else {
+                if (fleets) {
+                    fleetData = fleets;
+                    saveFleetData();
+                    importedParts.push('fleets');
+                }
+                if (overrides) {
+                    fleetViewOverrides = overrides;
+                    saveFleetViewOverrides();
+                    importedParts.push('fleetViewOverrides');
+                }
+                if (pendingSeen) {
+                    seenNotLogged = pendingSeen;
+                    saveSeenNotLogged();
+                    importedParts.push('seenNotLogged');
+                }
             }
 
-            return { aircraftCount: aircraftData.length, fleetsImported };
+            return {
+                aircraftCount: aircraftData.length,
+                importedParts,
+                fullSnapshot
+            };
+        }
+
+        function describeImportResult(result) {
+            const parts = [];
+            parts.push(`${result.aircraftCount} aircraft`);
+            if (result.importedParts.includes('fleets')) {
+                const fleetCount = Object.keys(fleetData || {}).length;
+                parts.push(`${fleetCount} fleet${fleetCount === 1 ? '' : 's'}`);
+            }
+            if (result.importedParts.includes('fleetViewOverrides')) {
+                parts.push('fleet view overrides');
+            }
+            if (result.importedParts.includes('seenNotLogged')) {
+                parts.push(`${seenNotLogged.length} seen-but-not-logged`);
+            }
+            if (result.fullSnapshot) {
+                return `Full backup restored: ${parts.join(', ')}.`;
+            }
+            if (result.importedParts.length === 1) {
+                return `Data imported successfully! ${result.aircraftCount} aircraft. (No fleet data in file — existing fleet lists kept.)`;
+            }
+            return `Data imported successfully! ${parts.join(', ')}.`;
         }
 
         function handleImportFile(e) {
@@ -4398,10 +4467,7 @@
                 try {
                     const importedData = JSON.parse(event.target.result);
                     const result = applyImportedData(importedData);
-                    const fleetNote = result.fleetsImported
-                        ? ' Fleet data imported too.'
-                        : ' (No fleet data in file — existing fleet lists kept.)';
-                    alert(`Data imported successfully! ${result.aircraftCount} aircraft.${fleetNote}`);
+                    alert(describeImportResult(result));
                     showLandingPage();
                 } catch (err) {
                     alert('Failed to import data: ' + err.message);
@@ -4689,6 +4755,11 @@
                     sightings.push({ location, date });
                 }
             });
+            const eligible = eligibleAircraftOverride || window._randomReviewEligibleAircraft;
+            const sourceRef = eligible ? eligible[index] : null;
+            const dataIndex = sourceRef != null ? aircraftData.indexOf(sourceRef) : -1;
+            const targetIndex = dataIndex >= 0 ? dataIndex : index;
+            const previousAircraft = aircraftData[targetIndex];
             const aircraft = {
                 registration: currentReg,
                 airline: currentOperator,
@@ -4701,12 +4772,8 @@
                 flown: wrapper.querySelector('#flown_random').checked,
                 trips: trips,
                 sightings: sightings,
-                loggedDate: new Date().toISOString()
+                loggedDate: previousAircraft?.loggedDate || new Date().toISOString()
             };
-            const eligible = eligibleAircraftOverride || window._randomReviewEligibleAircraft;
-            const sourceRef = eligible ? eligible[index] : null;
-            const dataIndex = sourceRef != null ? aircraftData.indexOf(sourceRef) : -1;
-            const targetIndex = dataIndex >= 0 ? dataIndex : index;
             aircraftData[targetIndex] = aircraft;
             if (eligible && eligible[index] !== undefined) {
                 eligible[index] = aircraft;
