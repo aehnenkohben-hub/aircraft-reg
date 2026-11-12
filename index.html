@@ -758,20 +758,6 @@
             flex: 1;
             min-width: 100px;
         }
-        .lookup-reg-btn,
-        .undo-lookup-btn {
-            flex: 0 0 auto;
-            padding: 8px 12px;
-            font-size: 0.85em;
-            margin: 0;
-        }
-        .undo-lookup-btn.hidden {
-            display: none;
-        }
-        .history-reg-lookup-status {
-            font-size: 0.85em;
-            margin: 0;
-        }
         .history-actions {
             display: flex;
             gap: 5px;
@@ -793,45 +779,6 @@
             margin-bottom: 0.65rem;
         }
 
-        .reg-lookup-hint {
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-            margin: 0 0 0.75rem 0;
-            line-height: 1.45;
-        }
-        .reg-lookup-status {
-            font-size: 0.9em;
-            margin-bottom: 10px;
-        }
-        .reg-lookup-status.loading { color: var(--primary); }
-        .reg-lookup-status.success { color: var(--success); }
-        .reg-lookup-status.error { color: var(--danger); }
-        .reg-lookup-status.hidden { display: none; }
-        .lookup-picker-section {
-            margin-bottom: 15px;
-        }
-        .lookup-picker-section.hidden {
-            display: none;
-        }
-        .history-lookup-match-row {
-            margin: 6px 0 4px 0;
-            max-width: 100%;
-        }
-        .history-lookup-match-row.hidden {
-            display: none;
-        }
-        .history-lookup-match-row label {
-            display: block;
-            font-size: 0.85em;
-            color: #666;
-            margin-bottom: 4px;
-        }
-        .history-lookup-match-row select {
-            width: 100%;
-            max-width: 520px;
-            padding: 8px;
-            font-size: 0.95em;
-        }
         .reg-format {
             text-transform: uppercase;
         }
@@ -1412,11 +1359,6 @@
             <div class="history-container" id="otherRegsSection">
                 <div class="history-title">Registration</div>
                 <div id="historyItemsContainer"></div>
-                <div id="lookupPickerSection" class="lookup-picker-section hidden">
-                    <label for="lookupResultPicker">Choose operator and type</label>
-                    <select id="lookupResultPicker"></select>
-                </div>
-                <div id="regLookupStatus" class="reg-lookup-status hidden" aria-live="polite"></div>
                 <button type="button" class="button secondary" id="addHistoryBtn">Add Another Registration</button>
             </div>
 
@@ -1834,12 +1776,6 @@
             addHistoryBtn.addEventListener('click', () => addHistoryItem('', '', false));
             addTripBtn.addEventListener('click', () => addTripItem('', '', '', false));
             addSightingBtn.addEventListener('click', () => addSightingItem('', '', false));
-            const lookupResultPicker = document.getElementById('lookupResultPicker');
-            if (lookupResultPicker) {
-                lookupResultPicker.addEventListener('change', () => {
-                    applySelectedLookupResult(createMainFormLookupContext());
-                });
-            }
             
             aircraftForm.addEventListener('submit', handleFormSubmit);
             
@@ -2589,8 +2525,6 @@
             inServiceCheckbox.checked = isActiveFleet;
             toggleOutOfServiceSection();
             syncSightingsSection();
-            hideLookupPicker(createMainFormLookupContext());
-            setLookupStatus(document.getElementById('regLookupStatus'), '', null);
             window.scrollTo(0, 0);
             setTimeout(() => {
                 const typeInput = document.getElementById('aircraftType');
@@ -2696,8 +2630,6 @@
                 addHistoryItem('', '', true);
                 addTripItem('', '', '', true);
                 syncSightingsSection();
-                hideLookupPicker(createMainFormLookupContext());
-                setLookupStatus(document.getElementById('regLookupStatus'), '', null);
                 setTimeout(() => {
                     const firstReg = historyItemsContainer.querySelector('.history-reg');
                     if (firstReg) firstReg.focus();
@@ -2735,21 +2667,6 @@
         
         function toggleFlightDetails() {
             flightDetails.classList.toggle('hidden', !flownCheckbox.checked);
-        }
-
-        let registrationLookupRequestId = 0;
-        let activeLookupResults = [];
-        let activeLookupHistoryItem = null;
-
-        function registrationLookupVariants(reg) {
-            const r = reg.trim().toUpperCase();
-            const variants = [r];
-            const noHyphen = r.replace(/-/g, '');
-            if (noHyphen !== r) variants.push(noHyphen);
-            if (!r.includes('-') && /^[A-Z][A-Z0-9]{3,}$/.test(r)) {
-                variants.push(`${r.slice(0, 1)}-${r.slice(1)}`);
-            }
-            return [...new Set(variants)];
         }
 
         function todayDateInputValue() {
@@ -2805,341 +2722,6 @@
                 ui.section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }
-
-        function setLookupStatus(statusEl, message, kind) {
-            if (!statusEl) return;
-            statusEl.textContent = message || '';
-            statusEl.classList.remove('loading', 'success', 'error', 'hidden');
-            if (!message) {
-                statusEl.classList.add('hidden');
-                return;
-            }
-            if (kind) statusEl.classList.add(kind);
-        }
-
-        function formatAircraftTypeFromRecord(record) {
-            if (!record) return '';
-            const manufacturer = (record.manufacturer || '').trim();
-            const type = (record.type || '').trim();
-            const icao = (record.icao_type || '').trim();
-            if (type) {
-                if (manufacturer) {
-                    const mfgToken = manufacturer.split(/\s+/)[0].toLowerCase();
-                    if (!type.toLowerCase().includes(mfgToken)) {
-                        return `${manufacturer} ${type}`.trim();
-                    }
-                }
-                return type;
-            }
-            if (manufacturer && icao) return `${manufacturer} ${icao}`.trim();
-            return icao || manufacturer || '';
-        }
-
-        function normalizeLookupRecord(raw, source) {
-            const registration = (raw.registration || raw.Registration || '').toUpperCase();
-            const operator = (raw.registered_owner || raw.RegisteredOwners || '').trim();
-            const manufacturer = (raw.manufacturer || raw.Manufacturer || '').trim();
-            const type = (raw.type || raw.Type || '').trim();
-            const icao_type = (raw.icao_type || raw.ICAOTypeCode || '').trim();
-            const record = { source, registration, operator, manufacturer, type, icao_type };
-            record.displayType = formatAircraftTypeFromRecord(record);
-            return record;
-        }
-
-        /** Registered owner plus airline name(s) from operator flag (ADSBdb /airline). */
-        async function lookupRecordsFromAircraft(raw) {
-            const records = [];
-            const seen = new Set();
-            const base = normalizeLookupRecord(raw, 'ADSBdb');
-            const ownerName = base.operator.trim();
-
-            function pushRecord(rec) {
-                if (!rec.registration && !rec.operator && !rec.displayType) return;
-                const key = `${rec.operator.toLowerCase()}|${rec.displayType.toLowerCase()}|${rec.registration}`;
-                if (seen.has(key)) return;
-                seen.add(key);
-                records.push(rec);
-            }
-
-            if (ownerName || base.displayType) {
-                pushRecord({ ...base, source: 'ADSBdb' });
-            }
-
-            const flag = (raw.registered_owner_operator_flag_code || raw.OperatorFlagCode || '').trim();
-            if (flag) {
-                try {
-                    const res = await fetch(`https://api.adsbdb.com/v0/airline/${encodeURIComponent(flag)}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        const airlines = Array.isArray(data.response) ? data.response : [];
-                        for (const airline of airlines) {
-                            const name = (airline.name || '').trim();
-                            if (!name) continue;
-                            if (ownerName && name.toLowerCase() === ownerName.toLowerCase()) continue;
-                            pushRecord({ ...base, operator: name, source: 'ADSBdb' });
-                        }
-                    }
-                } catch (err) {
-                    console.warn('ADSBdb airline lookup failed:', err);
-                }
-            }
-
-            return records;
-        }
-
-        async function collectLookupResults(registration) {
-            const candidates = registrationLookupVariants(registration);
-            const results = [];
-            const seen = new Set();
-
-            async function pushAircraft(raw) {
-                for (const rec of await lookupRecordsFromAircraft(raw)) {
-                    if (!rec.registration && !rec.operator && !rec.displayType) continue;
-                    const key = `${rec.operator.toLowerCase()}|${rec.displayType.toLowerCase()}|${rec.registration}`;
-                    if (seen.has(key)) continue;
-                    seen.add(key);
-                    results.push(rec);
-                }
-            }
-
-            for (const reg of candidates) {
-                try {
-                    const res = await fetch(`https://api.adsbdb.com/v0/aircraft/${encodeURIComponent(reg)}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.response?.aircraft) await pushAircraft(data.response.aircraft);
-                    }
-                } catch (err) {
-                    console.warn('ADSBdb lookup failed:', err);
-                }
-            }
-
-            return results;
-        }
-
-        function getCurrentHistoryItem() {
-            const current = document.querySelector('#historyItemsContainer .current-reg-checkbox:checked');
-            if (current) return current.closest('.history-reg-row');
-            return document.querySelector('#historyItemsContainer .history-reg-row');
-        }
-
-        function setRowLookupStatus(historyItem, message, kind) {
-            const el = historyItem?.querySelector('.history-reg-lookup-status');
-            if (!el) return;
-            el.textContent = message || '';
-            el.classList.remove('loading', 'success', 'error', 'hidden');
-            if (!message) {
-                el.classList.add('hidden');
-                return;
-            }
-            if (kind) el.classList.add(kind);
-        }
-
-        function captureRowLookupSnapshot(historyItem, lookupContext) {
-            return {
-                registration: historyItem.querySelector('.history-reg')?.value ?? '',
-                operator: historyItem.querySelector('.history-operator')?.value ?? '',
-                aircraftType: lookupContext.getTypeInput()?.value ?? ''
-            };
-        }
-
-        function restoreRowLookupSnapshot(historyItem, snapshot, lookupContext) {
-            const regInput = historyItem.querySelector('.history-reg');
-            const operatorInput = historyItem.querySelector('.history-operator');
-            if (regInput) regInput.value = snapshot.registration;
-            if (operatorInput) operatorInput.value = snapshot.operator;
-            const typeInput = lookupContext.getTypeInput();
-            if (typeInput && snapshot.aircraftType !== undefined) {
-                typeInput.value = snapshot.aircraftType;
-            }
-        }
-
-        function setUndoLookupVisible(historyItem, visible) {
-            const btn = historyItem.querySelector('.undo-lookup-btn');
-            if (btn) btn.classList.toggle('hidden', !visible);
-        }
-
-        function clearLookupUndo(historyItem) {
-            delete historyItem._lookupUndoSnapshot;
-            setUndoLookupVisible(historyItem, false);
-        }
-
-        function prepareLookupUndo(historyItem, lookupContext) {
-            historyItem._lookupUndoSnapshot = captureRowLookupSnapshot(historyItem, lookupContext);
-        }
-
-        function undoRegistrationLookup(historyItem, lookupContext) {
-            const snapshot = historyItem._lookupUndoSnapshot;
-            if (!snapshot) return;
-            restoreRowLookupSnapshot(historyItem, snapshot, lookupContext);
-            clearLookupUndo(historyItem);
-            hideRowLookupMatch(historyItem);
-            if (activeLookupHistoryItem === historyItem) {
-                hideLookupPicker(lookupContext);
-                setLookupStatus(lookupContext.getStatusEl(), '', null);
-            }
-            setRowLookupStatus(historyItem, 'Lookup undone.', 'success');
-        }
-
-        function hideRowLookupMatch(historyItem) {
-            if (!historyItem) return;
-            historyItem._lookupResults = [];
-            const section = historyItem.querySelector('.history-lookup-match-row');
-            const picker = historyItem.querySelector('.history-lookup-match-picker');
-            if (picker) picker.innerHTML = '';
-            if (section) section.classList.add('hidden');
-        }
-
-        function hideLookupPicker(lookupContext) {
-            activeLookupResults = [];
-            if (activeLookupHistoryItem) hideRowLookupMatch(activeLookupHistoryItem);
-            activeLookupHistoryItem = null;
-            const pickerSection = lookupContext.getPickerSection?.();
-            const picker = lookupContext.getPicker?.();
-            if (picker) picker.innerHTML = '';
-            if (pickerSection) pickerSection.classList.add('hidden');
-        }
-
-        function populateLookupPicker(results, lookupContext, historyItem) {
-            const row = historyItem || activeLookupHistoryItem;
-            activeLookupResults = results;
-            activeLookupHistoryItem = row;
-
-            const globalSection = lookupContext.getPickerSection?.();
-            const globalPicker = lookupContext.getPicker?.();
-            if (globalSection) globalSection.classList.add('hidden');
-            if (globalPicker) globalPicker.innerHTML = '';
-
-            const section = row?.querySelector('.history-lookup-match-row');
-            const picker = row?.querySelector('.history-lookup-match-picker');
-            if (!picker || !section) return;
-
-            row._lookupResults = results;
-            picker.innerHTML = '';
-            results.forEach((rec, index) => {
-                const opt = document.createElement('option');
-                opt.value = String(index);
-                const operatorLabel = rec.operator || 'Unknown operator';
-                const typeLabel = rec.displayType || 'Unknown type';
-                opt.textContent = `${operatorLabel} — ${typeLabel}`;
-                picker.appendChild(opt);
-            });
-            section.classList.toggle('hidden', results.length <= 1);
-        }
-
-        function attachRowLookupMatchPicker(historyItem, lookupContext) {
-            const picker = historyItem.querySelector('.history-lookup-match-picker');
-            if (!picker || picker.dataset.wired === '1') return;
-            picker.dataset.wired = '1';
-            picker.addEventListener('change', () => {
-                const results = historyItem._lookupResults;
-                if (!results?.length) return;
-                const record = results[parseInt(picker.value, 10)];
-                if (record) applyLookupRecord(record, historyItem, lookupContext);
-            });
-        }
-
-        function applyLookupRecord(record, historyItem, lookupContext) {
-            if (!record) return;
-            const regInput = historyItem.querySelector('.history-reg');
-            const operatorInput = historyItem.querySelector('.history-operator');
-            const isCurrent = historyItem.querySelector('.current-reg-checkbox')?.checked;
-
-            if (record.registration && regInput) {
-                regInput.value = record.registration;
-            }
-            if (operatorInput && record.operator) {
-                operatorInput.value = record.operator;
-            }
-
-            if (isCurrent) {
-                const typeInput = lookupContext.getTypeInput();
-                if (typeInput && record.displayType) {
-                    typeInput.value = record.displayType;
-                }
-                if (record.displayType) {
-                    setRowLookupStatus(historyItem, `Found: ${record.displayType}`, 'success');
-                }
-            } else {
-                setRowLookupStatus(historyItem, 'Operator filled for this registration.', 'success');
-            }
-        }
-
-        function applySelectedLookupResult(lookupContext) {
-            const picker = lookupContext.getPicker?.();
-            const results = activeLookupResults;
-            if (!picker || results.length === 0) return;
-            const record = results[parseInt(picker.value, 10)];
-            const historyItem = activeLookupHistoryItem || lookupContext.getActiveHistoryItem?.() || getCurrentHistoryItem();
-            if (!historyItem || !record) return;
-            applyLookupRecord(record, historyItem, lookupContext);
-            setLookupStatus(lookupContext.getStatusEl(), '', null);
-        }
-
-        async function runRegistrationLookup(regInput, historyItem, lookupContext) {
-            const reg = regInput.value.trim();
-            if (reg.length < 3) {
-                setRowLookupStatus(historyItem, 'Enter a full registration first.', 'error');
-                setLookupStatus(lookupContext.getStatusEl(), '', null);
-                return;
-            }
-
-            const requestId = ++registrationLookupRequestId;
-            hideLookupPicker(lookupContext);
-            setRowLookupStatus(historyItem, 'Looking up…', 'loading');
-            setLookupStatus(lookupContext.getStatusEl(), '', null);
-
-            const results = await collectLookupResults(reg);
-            if (requestId !== registrationLookupRequestId) return;
-
-            if (results.length === 0) {
-                setRowLookupStatus(historyItem, 'Not found — enter operator and type manually.', 'error');
-                return;
-            }
-
-            activeLookupHistoryItem = historyItem;
-            prepareLookupUndo(historyItem, lookupContext);
-            populateLookupPicker(results, lookupContext, historyItem);
-            const rowPicker = historyItem.querySelector('.history-lookup-match-picker');
-            if (rowPicker) rowPicker.selectedIndex = 0;
-            applyLookupRecord(results[0], historyItem, lookupContext);
-            setUndoLookupVisible(historyItem, true);
-
-            if (results.length > 1) {
-                setRowLookupStatus(
-                    historyItem,
-                    `${results.length} matches — pick operator below.`,
-                    'success'
-                );
-                setLookupStatus(lookupContext.getStatusEl(), '', null);
-            } else {
-                setLookupStatus(lookupContext.getStatusEl(), '', null);
-            }
-        }
-
-        function createMainFormLookupContext() {
-            return {
-                getTypeInput: () => document.getElementById('aircraftType'),
-                getStatusEl: () => document.getElementById('regLookupStatus'),
-                getPickerSection: () => document.getElementById('lookupPickerSection'),
-                getPicker: () => document.getElementById('lookupResultPicker'),
-                getActiveHistoryItem: () => getCurrentHistoryItem()
-            };
-        }
-
-        function createRandomReviewLookupContext(wrapper) {
-            return {
-                getTypeInput: () => wrapper.querySelector('#aircraftType_random'),
-                getStatusEl: () => wrapper.querySelector('#regLookupStatus_random'),
-                getPickerSection: () => wrapper.querySelector('#lookupPickerSection_random'),
-                getPicker: () => wrapper.querySelector('#lookupResultPicker_random'),
-                getActiveHistoryItem: () => {
-                    const current = wrapper.querySelector('#historyItemsContainer_random .current-reg-checkbox:checked');
-                    if (current) return current.closest('.history-reg-row');
-                    return wrapper.querySelector('#historyItemsContainer_random .history-reg-row');
-                }
-            };
-        }
         
         function addHistoryItem(registration, operator, isCurrent = false, isSeen = false) {
             const historyItem = document.createElement('div');
@@ -3147,29 +2729,17 @@
             
             const isInService = inServiceCheckbox.checked;
             const buttonText = isInService ? 'Current' : 'Last Known';
-            const enableLookup = parseInt(editIndexInput.value, 10) >= 0;
             
             historyItem.innerHTML = `
                 <div class="history-reg-row-fields">
                     <input type="text" class="history-reg reg-format" placeholder="Registration" value="${registration}" required>
-                    <input type="text" class="history-operator" placeholder="${enableLookup ? 'Operator (auto-filled)' : 'Operator'}" value="${operator}">
-                    ${enableLookup ? `
-                    <button type="button" class="button secondary lookup-reg-btn">Look up</button>
-                    <button type="button" class="button secondary undo-lookup-btn hidden">Undo</button>
-                    ` : ''}
+                    <input type="text" class="history-operator" placeholder="Operator" value="${operator}">
                     <div class="history-actions">
                         <button type="button" class="button ${isInService ? 'current-reg-btn' : 'last-known-btn'} set-current-btn">${buttonText}</button>
                         <button type="button" class="button seen set-seen-btn">Seen</button>
                         <button type="button" class="button delete remove-history-btn">×</button>
                     </div>
                 </div>
-                ${enableLookup ? `
-                <div class="history-reg-lookup-status reg-lookup-status hidden" aria-live="polite"></div>
-                <div class="history-lookup-match-row hidden">
-                    <label>Choose operator / type from lookup:</label>
-                    <select class="history-lookup-match-picker"></select>
-                </div>
-                ` : ''}
                 <input type="checkbox" class="current-reg-checkbox hidden" ${isCurrent ? 'checked' : ''}>
                 <input type="checkbox" class="seen-checkbox hidden" ${isSeen ? 'checked' : ''}>
             `;
@@ -3179,24 +2749,8 @@
             const regInputEl = historyItem.querySelector('.history-reg');
             regInputEl.addEventListener('input', function() {
                 this.value = this.value.toUpperCase();
-                if (!enableLookup) return;
-                clearLookupUndo(historyItem);
-                hideRowLookupMatch(historyItem);
             });
             attachRegistrationDuplicateCheck(regInputEl, null);
-            const lookupContext = enableLookup ? createMainFormLookupContext() : null;
-            if (enableLookup) {
-                attachRowLookupMatchPicker(historyItem, lookupContext);
-                historyItem.querySelector('.lookup-reg-btn').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const regInput = historyItem.querySelector('.history-reg');
-                    if (regInput) runRegistrationLookup(regInput, historyItem, lookupContext);
-                });
-                historyItem.querySelector('.undo-lookup-btn').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    undoRegistrationLookup(historyItem, lookupContext);
-                });
-            }
             
             historyItem.querySelector('.remove-history-btn').addEventListener('click', () => {
                 if (document.querySelectorAll('#historyItemsContainer .history-reg-row').length > 1) {
@@ -3220,12 +2774,6 @@
                 
                 this.textContent = `✓ ${buttonText}`;
                 this.style.backgroundColor = '#34c759';
-
-                if (!enableLookup) return;
-                const regInput = historyItem.querySelector('.history-reg');
-                if (regInput && regInput.value.trim().length >= 3) {
-                    runRegistrationLookup(regInput, historyItem, lookupContext);
-                }
             });
             
             historyItem.querySelector('.set-seen-btn').addEventListener('click', function() {
@@ -4791,19 +4339,12 @@
             historyItem.innerHTML = `
                 <div class="history-reg-row-fields">
                     <input type="text" class="history-reg reg-format" placeholder="Registration" value="${registration}" required>
-                    <input type="text" class="history-operator" placeholder="Operator (auto-filled)" value="${operator}">
-                    <button type="button" class="button secondary lookup-reg-btn">Look up</button>
-                    <button type="button" class="button secondary undo-lookup-btn hidden">Undo</button>
+                    <input type="text" class="history-operator" placeholder="Operator" value="${operator}">
                     <div class="history-actions">
                         <button type="button" class="button ${isInService ? 'current-reg-btn' : 'last-known-btn'} set-current-btn">${buttonText}</button>
                         <button type="button" class="button seen set-seen-btn">Seen</button>
                         <button type="button" class="button delete remove-history-btn">×</button>
                     </div>
-                </div>
-                <div class="history-reg-lookup-status reg-lookup-status hidden" aria-live="polite"></div>
-                <div class="history-lookup-match-row hidden">
-                    <label>Choose operator / type from lookup:</label>
-                    <select class="history-lookup-match-picker"></select>
                 </div>
                 <input type="checkbox" class="current-reg-checkbox hidden" ${isCurrent ? 'checked' : ''}>
                 <input type="checkbox" class="seen-checkbox hidden" ${isSeen ? 'checked' : ''}>
@@ -4812,21 +4353,8 @@
             const regInputElRandom = historyItem.querySelector('.history-reg');
             regInputElRandom.addEventListener('input', function() {
                 this.value = this.value.toUpperCase();
-                clearLookupUndo(historyItem);
-                hideRowLookupMatch(historyItem);
             });
             attachRegistrationDuplicateCheck(regInputElRandom, wrapper);
-            const lookupContext = createRandomReviewLookupContext(wrapper);
-            attachRowLookupMatchPicker(historyItem, lookupContext);
-            historyItem.querySelector('.lookup-reg-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                const regInput = historyItem.querySelector('.history-reg');
-                if (regInput) runRegistrationLookup(regInput, historyItem, lookupContext);
-            });
-            historyItem.querySelector('.undo-lookup-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                undoRegistrationLookup(historyItem, lookupContext);
-            });
             historyItem.querySelector('.remove-history-btn').addEventListener('click', () => {
                 if (wrapper.querySelectorAll('#historyItemsContainer_random .history-reg-row').length > 1) {
                     historyItem.remove();
@@ -4846,11 +4374,6 @@
                 });
                 this.textContent = `✓ ${buttonText}`;
                 this.style.backgroundColor = '#34c759';
-
-                const regInput = historyItem.querySelector('.history-reg');
-                if (regInput && regInput.value.trim().length >= 3) {
-                    runRegistrationLookup(regInput, historyItem, lookupContext);
-                }
             });
             historyItem.querySelector('.set-seen-btn').addEventListener('click', function() {
                 const seenCheckbox = historyItem.querySelector('.seen-checkbox');
@@ -4978,13 +4501,6 @@
             if (addHistoryBtn && historyItemsContainer) {
                 addHistoryBtn.addEventListener('click', function() {
                     addHistoryItemRandom('', '', false, false, wrapper);
-                });
-            }
-            const lookupCtx = createRandomReviewLookupContext(wrapper);
-            const lookupResultPicker = wrapper.querySelector('#lookupResultPicker_random');
-            if (lookupResultPicker) {
-                lookupResultPicker.addEventListener('change', () => {
-                    applySelectedLookupResult(lookupCtx);
                 });
             }
             const addTripBtn = wrapper.querySelector('#addTripBtn_random');
