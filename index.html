@@ -753,10 +753,14 @@
             align-items: center;
             flex-wrap: wrap;
         }
-        .history-reg-row-fields .history-reg,
-        .history-reg-row-fields .history-operator {
+        .history-reg-row-fields .history-reg {
             flex: 1;
             min-width: 100px;
+        }
+        .history-reg-row-fields .history-operator-combobox {
+            flex: 1;
+            min-width: 140px;
+            position: relative;
         }
         .history-actions {
             display: flex;
@@ -940,11 +944,13 @@
             margin-bottom: 0;
         }
 
-        .fleet-airline-combobox {
+        .fleet-airline-combobox,
+        .history-operator-combobox {
             position: relative;
         }
 
-        .fleet-airline-control {
+        .fleet-airline-control,
+        .history-operator-control {
             display: flex;
             align-items: stretch;
             gap: 0;
@@ -954,12 +960,14 @@
             overflow: hidden;
         }
 
-        .fleet-airline-control:focus-within {
+        .fleet-airline-control:focus-within,
+        .history-operator-control:focus-within {
             border-color: var(--primary);
             box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
         }
 
-        .fleet-airline-control input {
+        .fleet-airline-control input,
+        .history-operator-control input {
             flex: 1;
             min-width: 0;
             margin: 0 !important;
@@ -971,7 +979,8 @@
             font-size: 0.9375rem;
         }
 
-        .fleet-airline-toggle {
+        .fleet-airline-toggle,
+        .history-operator-toggle {
             flex: 0 0 auto;
             width: 2.5rem;
             margin: 0;
@@ -985,12 +994,14 @@
             line-height: 1;
         }
 
-        .fleet-airline-toggle:hover {
+        .fleet-airline-toggle:hover,
+        .history-operator-toggle:hover {
             background: var(--border);
             color: var(--text);
         }
 
-        .fleet-airline-listbox {
+        .fleet-airline-listbox,
+        .history-operator-listbox {
             position: absolute;
             z-index: 30;
             left: 0;
@@ -1007,33 +1018,40 @@
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
         }
 
-        .fleet-airline-listbox.hidden {
+        .fleet-airline-listbox.hidden,
+        .history-operator-listbox.hidden {
             display: none;
         }
 
-        .fleet-airline-option {
+        .fleet-airline-option,
+        .history-operator-option {
             padding: 0.5rem 0.75rem;
             cursor: pointer;
             font-size: 0.9375rem;
         }
 
         .fleet-airline-option:hover,
-        .fleet-airline-option.is-active {
+        .fleet-airline-option.is-active,
+        .history-operator-option:hover,
+        .history-operator-option.is-active {
             background: color-mix(in srgb, var(--primary) 12%, transparent);
         }
 
-        .fleet-airline-option.is-selected {
+        .fleet-airline-option.is-selected,
+        .history-operator-option.is-selected {
             font-weight: 600;
         }
 
-        .fleet-airline-option.is-create {
+        .fleet-airline-option.is-create,
+        .history-operator-option.is-create {
             color: var(--primary);
             border-top: 1px solid var(--border);
             margin-top: 0.15rem;
             padding-top: 0.65rem;
         }
 
-        .fleet-airline-empty {
+        .fleet-airline-empty,
+        .history-operator-empty {
             padding: 0.65rem 0.75rem;
             font-size: 0.875rem;
             color: var(--text-muted);
@@ -3101,6 +3119,198 @@
             }
         }
         
+        let historyOperatorComboSeq = 0;
+
+        function buildHistoryOperatorComboboxHtml(operator) {
+            const seq = ++historyOperatorComboSeq;
+            const listId = `historyOperatorList_${seq}`;
+            return `
+                <div class="history-operator-combobox">
+                    <div class="history-operator-control">
+                        <input type="text" class="history-operator" role="combobox" aria-autocomplete="list"
+                            aria-expanded="false" aria-controls="${listId}" aria-label="Search or add operator"
+                            placeholder="Search or add operator…" value="${escapeHtml(operator || '')}"
+                            autocomplete="off" spellcheck="false">
+                        <button type="button" class="history-operator-toggle" aria-label="Show operators" tabindex="-1">▾</button>
+                    </div>
+                    <ul id="${listId}" class="history-operator-listbox hidden" role="listbox" aria-label="Operators"></ul>
+                </div>
+            `;
+        }
+
+        function attachHistoryOperatorCombobox(historyItem) {
+            const input = historyItem.querySelector('.history-operator');
+            const listbox = historyItem.querySelector('.history-operator-listbox');
+            const toggle = historyItem.querySelector('.history-operator-toggle');
+            if (!input || !listbox) return;
+
+            let selected = (input.value || '').trim();
+            let highlightIndex = -1;
+
+            function getOptions() {
+                return getLoadedAirlines();
+            }
+
+            function getItems(query) {
+                const typed = (query || '').trim();
+                const options = getOptions();
+                const q = typed.toLowerCase();
+                const matches = (!q ? options.slice() : options.filter(name => name.toLowerCase().includes(q)))
+                    .map(name => ({ type: 'airline', name }));
+                const hasExact = !!typed && options.some(a => airlinesMatch(a, typed));
+                if (typed && !hasExact) {
+                    matches.push({ type: 'create', name: typed });
+                }
+                return matches;
+            }
+
+            function isOpen() {
+                return !listbox.classList.contains('hidden');
+            }
+
+            function close() {
+                listbox.classList.add('hidden');
+                input.setAttribute('aria-expanded', 'false');
+                highlightIndex = -1;
+                input.setAttribute('aria-activedescendant', '');
+            }
+
+            function render(filterText) {
+                const items = getItems(filterText);
+                listbox.innerHTML = '';
+                if (!items.length) {
+                    const empty = document.createElement('li');
+                    empty.className = 'history-operator-empty';
+                    empty.textContent = 'Type a name to add a new operator.';
+                    listbox.appendChild(empty);
+                    highlightIndex = -1;
+                    return;
+                }
+                if (highlightIndex >= items.length) highlightIndex = items.length - 1;
+                if (highlightIndex < 0) highlightIndex = 0;
+
+                items.forEach((item, index) => {
+                    const option = document.createElement('li');
+                    option.className = 'history-operator-option';
+                    option.setAttribute('role', 'option');
+                    option.id = `${listbox.id}_opt_${index}`;
+                    if (item.type === 'create') {
+                        option.classList.add('is-create');
+                        option.textContent = `Add “${item.name}”`;
+                    } else {
+                        option.textContent = item.name;
+                        if (selected && airlinesMatch(selected, item.name)) {
+                            option.classList.add('is-selected');
+                            option.setAttribute('aria-selected', 'true');
+                        } else {
+                            option.setAttribute('aria-selected', 'false');
+                        }
+                    }
+                    if (index === highlightIndex) option.classList.add('is-active');
+                    option.addEventListener('mousedown', (event) => {
+                        event.preventDefault();
+                        choose(item);
+                    });
+                    listbox.appendChild(option);
+                });
+
+                const active = listbox.querySelector('.history-operator-option.is-active');
+                input.setAttribute('aria-activedescendant', active ? active.id : '');
+            }
+
+            function open(filterText) {
+                render(filterText !== undefined ? filterText : input.value);
+                listbox.classList.remove('hidden');
+                input.setAttribute('aria-expanded', 'true');
+            }
+
+            function commit(name) {
+                selected = (name || '').trim();
+                input.value = selected;
+                close();
+            }
+
+            function choose(item) {
+                if (!item) return;
+                if (item.type === 'create') {
+                    const trimmed = item.name.trim();
+                    if (!trimmed) return;
+                    const existing = getOptions().find(a => airlinesMatch(a, trimmed));
+                    if (existing) {
+                        commit(existing);
+                        return;
+                    }
+                    ensureFleetAirlineArray(trimmed);
+                    saveFleetData();
+                    fleetAirlineOptions = getLoadedAirlines();
+                    commit(trimmed);
+                    return;
+                }
+                commit(item.name);
+            }
+
+            input.addEventListener('focus', () => open(input.value));
+            input.addEventListener('input', () => {
+                highlightIndex = 0;
+                open(input.value);
+            });
+            input.addEventListener('keydown', (event) => {
+                const items = getItems(input.value);
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    if (!isOpen()) open(input.value);
+                    highlightIndex = Math.min(items.length - 1, Math.max(0, highlightIndex + 1));
+                    render(input.value);
+                    listbox.querySelector('.history-operator-option.is-active')?.scrollIntoView({ block: 'nearest' });
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    if (!isOpen()) open(input.value);
+                    highlightIndex = Math.max(0, highlightIndex <= 0 ? 0 : highlightIndex - 1);
+                    render(input.value);
+                    listbox.querySelector('.history-operator-option.is-active')?.scrollIntoView({ block: 'nearest' });
+                } else if (event.key === 'Enter') {
+                    if (!isOpen()) return;
+                    event.preventDefault();
+                    const pick = items[highlightIndex] || items[0];
+                    if (pick) choose(pick);
+                } else if (event.key === 'Escape') {
+                    if (isOpen()) {
+                        event.preventDefault();
+                        close();
+                        input.value = selected;
+                    }
+                }
+            });
+            input.addEventListener('blur', () => {
+                setTimeout(() => {
+                    if (listbox.contains(document.activeElement) || document.activeElement === toggle) return;
+                    close();
+                    const typed = input.value.trim();
+                    if (!typed) {
+                        selected = '';
+                        input.value = '';
+                        return;
+                    }
+                    const exact = getOptions().find(a => airlinesMatch(a, typed));
+                    if (exact) commit(exact);
+                    else input.value = selected;
+                }, 120);
+            });
+
+            if (toggle) {
+                toggle.addEventListener('mousedown', (event) => event.preventDefault());
+                toggle.addEventListener('click', () => {
+                    if (isOpen()) {
+                        close();
+                        return;
+                    }
+                    input.focus();
+                    highlightIndex = 0;
+                    open('');
+                });
+            }
+        }
+
         function addHistoryItem(registration, operator, isCurrent = false, isSeen = false) {
             const historyItem = document.createElement('div');
             historyItem.className = 'history-item history-reg-row';
@@ -3111,7 +3321,7 @@
             historyItem.innerHTML = `
                 <div class="history-reg-row-fields">
                     <input type="text" class="history-reg reg-format" placeholder="Registration" value="${registration}" required>
-                    <input type="text" class="history-operator" placeholder="Operator" value="${operator}">
+                    ${buildHistoryOperatorComboboxHtml(operator)}
                     <div class="history-actions">
                         <button type="button" class="button ${isInService ? 'current-reg-btn' : 'last-known-btn'} set-current-btn">${buttonText}</button>
                         <button type="button" class="button seen set-seen-btn">Seen</button>
@@ -3129,6 +3339,7 @@
                 this.value = this.value.toUpperCase();
             });
             attachRegistrationDuplicateCheck(regInputEl, null);
+            attachHistoryOperatorCombobox(historyItem);
             
             historyItem.querySelector('.remove-history-btn').addEventListener('click', () => {
                 if (document.querySelectorAll('#historyItemsContainer .history-reg-row').length > 1) {
@@ -4717,7 +4928,7 @@
             historyItem.innerHTML = `
                 <div class="history-reg-row-fields">
                     <input type="text" class="history-reg reg-format" placeholder="Registration" value="${registration}" required>
-                    <input type="text" class="history-operator" placeholder="Operator" value="${operator}">
+                    ${buildHistoryOperatorComboboxHtml(operator)}
                     <div class="history-actions">
                         <button type="button" class="button ${isInService ? 'current-reg-btn' : 'last-known-btn'} set-current-btn">${buttonText}</button>
                         <button type="button" class="button seen set-seen-btn">Seen</button>
@@ -4733,6 +4944,7 @@
                 this.value = this.value.toUpperCase();
             });
             attachRegistrationDuplicateCheck(regInputElRandom, wrapper);
+            attachHistoryOperatorCombobox(historyItem);
             historyItem.querySelector('.remove-history-btn').addEventListener('click', () => {
                 if (wrapper.querySelectorAll('#historyItemsContainer_random .history-reg-row').length > 1) {
                     historyItem.remove();
