@@ -1819,22 +1819,39 @@
         
         function loadAircraftData() {
             const savedData = localStorage.getItem('aircraftData');
-            if (savedData) {
-                try {
-                    aircraftData = JSON.parse(savedData) || [];
-                    if (migrateAircraftHistoryOrders(aircraftData)) {
-                        saveAircraftData();
-                    }
-                    console.log("Loaded aircraft data:", aircraftData);
-                } catch (e) {
-                    console.error("Error parsing aircraft data:", e);
-                    aircraftData = [];
-                }
+            if (!savedData) return;
+            try {
+                aircraftData = JSON.parse(savedData) || [];
+            } catch (e) {
+                console.error("Error parsing aircraft data:", e);
+                aircraftData = [];
+                return;
             }
+            if (!Array.isArray(aircraftData)) {
+                aircraftData = [];
+                return;
+            }
+            // Migration must never wipe a successfully parsed log.
+            try {
+                if (migrateAircraftHistoryOrders(aircraftData)) {
+                    saveAircraftData();
+                }
+            } catch (e) {
+                console.error("Error migrating aircraft history order:", e);
+            }
+            console.log("Loaded aircraft data:", aircraftData);
         }
         
         function saveAircraftData() {
             localStorage.setItem('aircraftData', JSON.stringify(aircraftData));
+        }
+
+        function isHistoryEntry(item) {
+            return !!item && typeof item === 'object' && !Array.isArray(item);
+        }
+
+        function sameRegOperatorPair(aReg, aOp, bReg, bOp) {
+            return (aReg || '') === (bReg || '') && (aOp || '') === (bOp || '');
         }
 
         /** Ensure history is newest→oldest and includes the current/last-known entry. Returns true if anything changed. */
@@ -1843,10 +1860,9 @@
             let changed = false;
             list.forEach(aircraft => {
                 if (!aircraft || typeof aircraft !== 'object') return;
-                const history = Array.isArray(aircraft.history) ? aircraft.history : [];
-                if (history.some(item => item.isCurrent)) return;
+                const before = JSON.stringify(aircraft.history || []);
                 aircraft.history = getOrderedHistoryForForm(aircraft);
-                changed = true;
+                if (JSON.stringify(aircraft.history || []) !== before) changed = true;
             });
             return changed;
         }
@@ -2110,7 +2126,9 @@
                 addAirline(display.currentOperator);
                 addAirline(aircraft.airline);
                 if (Array.isArray(aircraft.history)) {
-                    aircraft.history.forEach(item => addAirline(item.operator));
+                    aircraft.history.forEach(item => {
+                        if (isHistoryEntry(item)) addAirline(item.operator);
+                    });
                 }
             });
             // Only keep fleet airlines that still have at least one registration
@@ -2726,7 +2744,7 @@
         function getCurrentSeenForAirline(aircraft, airline) {
             let seen = !!aircraft.currentIsSeen;
             if (Array.isArray(aircraft.history)) {
-                const current = aircraft.history.find(item => item.isCurrent);
+                const current = aircraft.history.find(item => isHistoryEntry(item) && item.isCurrent);
                 if (current && airlinesMatch(current.operator, airline) && current.isSeen) {
                     seen = true;
                 }
@@ -2794,6 +2812,7 @@
 
             if (Array.isArray(aircraft.history)) {
                 aircraft.history.forEach(item => {
+                    if (!isHistoryEntry(item)) return;
                     const op = (item.operator || '').trim();
                     const reg = (item.registration || '').trim();
                     if (!op || !reg || op.toLowerCase() === 'unknown') return;
@@ -2908,6 +2927,7 @@
 
                 if (Array.isArray(aircraft.history)) {
                     aircraft.history.forEach(item => {
+                        if (!isHistoryEntry(item)) return;
                         if (!airlinesMatch(item.operator, airline)) return;
                         if (item.isCurrent && currentOnActive) return;
                         const reg = (item.registration || '').trim();
@@ -3010,6 +3030,7 @@
                 aircraft.currentIsSeen = !!seen;
                 if (Array.isArray(aircraft.history)) {
                     aircraft.history.forEach(item => {
+                        if (!isHistoryEntry(item)) return;
                         if (item.isCurrent && airlinesMatch(item.operator, airline)) {
                             item.isSeen = !!seen;
                         }
@@ -3018,6 +3039,7 @@
             } else if (Array.isArray(aircraft.history)) {
                 const regKey = normalizeRegistrationKey(entry.registration);
                 aircraft.history.forEach(item => {
+                    if (!isHistoryEntry(item)) return;
                     if (!airlinesMatch(item.operator, airline)) return;
                     if (normalizeRegistrationKey(item.registration) !== regKey) return;
                     if (item.isCurrent && airlinesMatch(display.currentOperator, airline)) return;
@@ -3338,6 +3360,7 @@
                     }
                     if (Array.isArray(aircraft.history)) {
                         const histSeen = aircraft.history.some(h =>
+                            isHistoryEntry(h) &&
                             normalizeRegistrationKey(h.registration) === normalizeRegistrationKey(item.registration) &&
                             airlinesMatch(h.operator, item.airline) &&
                             !!h.isSeen
@@ -3811,30 +3834,60 @@
 
         /** Ordered rows for the log form: newest/current first. Legacy data without isCurrent gets current prepended. */
         function getOrderedHistoryForForm(aircraft) {
-            const history = Array.isArray(aircraft.history) ? aircraft.history : [];
+            const rawHistory = Array.isArray(aircraft?.history) ? aircraft.history : [];
+            const history = rawHistory.filter(isHistoryEntry);
+            const currentReg = aircraft?.registration || '';
+            const currentOp = aircraft?.airline || '';
+            const normalizeEntry = (item, forceCurrent) => ({
+                registration: item.registration || '',
+                operator: item.operator || '',
+                isCurrent: forceCurrent != null ? !!forceCurrent : !!item.isCurrent,
+                isSeen: !!item.isSeen
+            });
+
             const hasCurrentInHistory = history.some(item => item.isCurrent);
             if (hasCurrentInHistory) {
-                return history.map(item => ({
-                    registration: item.registration || '',
-                    operator: item.operator || '',
-                    isCurrent: !!item.isCurrent,
-                    isSeen: !!item.isSeen
-                }));
+                // Keep user order; drop null/invalid rows and exact duplicate current pairs.
+                const seenPairs = new Set();
+                const ordered = [];
+                history.forEach(item => {
+                    const entry = normalizeEntry(item);
+                    const key = `${entry.registration}\0${entry.operator}`;
+                    if (entry.isCurrent) {
+                        if (seenPairs.has(`current:${key}`)) return;
+                        seenPairs.add(`current:${key}`);
+                        ordered.push(entry);
+                        return;
+                    }
+                    // Drop non-current duplicate of a current pair (legacy residue).
+                    const duplicatesCurrent = history.some(h =>
+                        h.isCurrent && sameRegOperatorPair(h.registration, h.operator, entry.registration, entry.operator)
+                    );
+                    if (duplicatesCurrent) return;
+                    if (seenPairs.has(key)) return;
+                    seenPairs.add(key);
+                    ordered.push(entry);
+                });
+                return ordered;
             }
-            return [
-                {
-                    registration: aircraft.registration || '',
-                    operator: aircraft.airline || '',
-                    isCurrent: true,
-                    isSeen: !!aircraft.currentIsSeen
-                },
-                ...history.map(item => ({
-                    registration: item.registration || '',
-                    operator: item.operator || '',
-                    isCurrent: false,
-                    isSeen: !!item.isSeen
-                }))
-            ];
+
+            const currentEntry = {
+                registration: currentReg,
+                operator: currentOp,
+                isCurrent: true,
+                isSeen: !!aircraft?.currentIsSeen
+            };
+            const rest = [];
+            const seenPairs = new Set();
+            history.forEach(item => {
+                if (sameRegOperatorPair(item.registration, item.operator, currentReg, currentOp)) return;
+                const entry = normalizeEntry(item, false);
+                const key = `${entry.registration}\0${entry.operator}`;
+                if (seenPairs.has(key)) return;
+                seenPairs.add(key);
+                rest.push(entry);
+            });
+            return [currentEntry, ...rest];
         }
 
         /** Collect registration rows in DOM order, including the current/last-known entry. */
@@ -4061,17 +4114,18 @@
             let currentReg = aircraft.registration;
             let currentOperator = aircraft.airline || 'Unknown';
             let seenItems = [];
-            if (aircraft.history?.length > 0) {
-                const currentInHistory = aircraft.history.find(item => item.isCurrent);
+            const history = Array.isArray(aircraft.history) ? aircraft.history.filter(isHistoryEntry) : [];
+            if (history.length > 0) {
+                const currentInHistory = history.find(item => item.isCurrent);
                 if (currentInHistory) {
                     currentReg = currentInHistory.registration;
                     currentOperator = currentInHistory.operator || 'Unknown';
                 }
-                seenItems = aircraft.history.filter(item => item.isSeen);
+                seenItems = history.filter(item => item.isSeen);
             }
             if (aircraft.currentIsSeen) {
                 const alreadyIncluded = seenItems.some(item =>
-                    item.registration === aircraft.registration && item.operator === aircraft.airline
+                    sameRegOperatorPair(item.registration, item.operator, aircraft.registration, aircraft.airline)
                 );
                 if (!alreadyIncluded) {
                     seenItems = [
@@ -4080,6 +4134,14 @@
                     ];
                 }
             }
+            // Dedupe identical reg+operator pairs (migration / legacy residue).
+            const seenPairs = new Set();
+            seenItems = seenItems.filter(item => {
+                const key = `${item.registration || ''}\0${item.operator || ''}`;
+                if (seenPairs.has(key)) return false;
+                seenPairs.add(key);
+                return true;
+            });
             const operatorUrlPart = currentOperator && currentOperator !== 'Unknown'
                 ? currentOperator.replace(/\s+/g, '-')
                 : '';
@@ -4751,7 +4813,7 @@
 
             if (Array.isArray(aircraft.history)) {
                 aircraft.history.forEach(item => {
-                    if (item.isCurrent) return;
+                    if (!isHistoryEntry(item) || item.isCurrent) return;
                     addReg(item.registration);
                     addOp(item.operator);
                 });
@@ -4875,7 +4937,9 @@
                     if ((aircraft.registration || '').toLowerCase().includes(searchVal)) return true;
                     // Check all history registrations
                     if (Array.isArray(aircraft.history)) {
-                        return aircraft.history.some(item => (item.registration || '').toLowerCase().includes(searchVal));
+                        return aircraft.history.some(item =>
+                            isHistoryEntry(item) && (item.registration || '').toLowerCase().includes(searchVal)
+                        );
                     }
                     return false;
                 });
