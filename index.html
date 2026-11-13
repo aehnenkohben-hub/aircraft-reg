@@ -5066,6 +5066,8 @@
         function showRandomReviewPage() {
             hideAllMainViews();
             randomReviewPage.classList.remove('hidden');
+            randomReviewPage.hidden = false;
+            window.scrollTo(0, 0);
         }
         function showRandomAircraftForReview() {
             const eligibleAircraft = window._randomReviewEligibleAircraft;
@@ -5115,6 +5117,7 @@
         }
         function exitRandomReview() {
             randomReviewPage.classList.add('hidden');
+            randomReviewPage.hidden = true;
             showLandingPage('tools');
         }
         // Helper to render the edit form for a given aircraft index inside a container
