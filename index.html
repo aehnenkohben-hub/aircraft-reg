@@ -1842,12 +1842,32 @@
             console.log("Loaded aircraft data:", aircraftData);
         }
         
+        function getLocalStorageSaveErrorMessage(err, payloadLength) {
+            const name = err?.name || '';
+            const sizeKb = Math.max(1, Math.round((payloadLength || 0) / 1024));
+            if (name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+                return `Browser storage is full (log is about ${sizeKb} KB). In Tools, Export Data as a backup, then free storage or remove unused site data for this site and try again.`;
+            }
+            if (name === 'SecurityError') {
+                return 'Browser storage is blocked for this site. Turn off Private/Incognito browsing and allow cookies/site data, then try again.';
+            }
+            // Safari private mode often reports QuotaExceededError; other browsers may use a generic error.
+            return 'Could not save to browser storage. This usually means Private/Incognito mode, blocked cookies/site data, or a full storage quota. Allow site data for this site (or leave Private mode) and try again.';
+        }
+
         function saveAircraftData() {
+            let payload;
             try {
-                localStorage.setItem('aircraftData', JSON.stringify(aircraftData));
+                payload = JSON.stringify(aircraftData);
             } catch (e) {
-                console.error('Error saving aircraft data:', e);
-                throw new Error('Could not save to browser storage. It may be full or blocked.');
+                console.error('Error serializing aircraft data:', e);
+                throw new Error('Could not prepare aircraft data for saving. Export a backup from Tools if you can, then refresh and try again.');
+            }
+            try {
+                localStorage.setItem('aircraftData', payload);
+            } catch (e) {
+                console.error('Error saving aircraft data:', e?.name, e, 'bytes=', payload.length);
+                throw new Error(getLocalStorageSaveErrorMessage(e, payload.length));
             }
         }
 
