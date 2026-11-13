@@ -1568,7 +1568,7 @@
         <header class="page-header">
             <h2 id="formTitle">Log Aircraft</h2>
         </header>
-        <form id="aircraftForm">
+        <form id="aircraftForm" novalidate>
             <input type="hidden" id="editIndex" value="-1">
             
             <div class="history-container" id="otherRegsSection">
@@ -1843,7 +1843,12 @@
         }
         
         function saveAircraftData() {
-            localStorage.setItem('aircraftData', JSON.stringify(aircraftData));
+            try {
+                localStorage.setItem('aircraftData', JSON.stringify(aircraftData));
+            } catch (e) {
+                console.error('Error saving aircraft data:', e);
+                throw new Error('Could not save to browser storage. It may be full or blocked.');
+            }
         }
 
         function isHistoryEntry(item) {
@@ -4163,7 +4168,9 @@
                     if (trimmed) keys.add(normalizeRegistrationKey(trimmed));
                 };
                 add(ac.registration);
-                (ac.history || []).forEach(item => add(item.registration));
+                (ac.history || []).forEach(item => {
+                    if (isHistoryEntry(item)) add(item.registration);
+                });
                 if (!keys.has(regKey)) continue;
                 const display = getAircraftDisplayInfo(ac);
                 return {
@@ -4671,118 +4678,147 @@
         function handleFormSubmit(e) {
             e.preventDefault();
 
-            const registrationItems = document.querySelectorAll('#historyItemsContainer .history-reg-row');
-            if (registrationItems.length === 0) {
-                alert('You must add at least one registration.');
-                return;
-            }
-
-            const hasCurrent = Array.from(document.querySelectorAll('#historyItemsContainer .current-reg-checkbox')).some(cb => cb.checked);
-            if (!hasCurrent) {
-                alert('You must mark one registration as Current/Last Known.');
-                return;
-            }
-
-            const aircraftTypeValue = (document.getElementById('aircraftType').value || '').trim();
-            const {
-                historyItems,
-                currentReg,
-                currentOperator,
-                currentIsSeen,
-                missingReg
-            } = collectHistoryFromContainer(historyItemsContainer);
-
-            if (missingReg) {
-                alert('All registrations must have a registration number.');
-                return;
-            }
-
-            if (!currentReg) {
-                alert('You must mark one registration as Current/Last Known.');
-                return;
-            }
-
-            const editIndexForDupes = parseInt(editIndexInput.value, 10);
-            const duplicateRegs = findDuplicateRegistrationsInForm(null, editIndexForDupes >= 0 ? editIndexForDupes : -1);
-            if (!confirmDuplicateRegistrationsOverride(duplicateRegs)) {
-                return;
-            }
-
-            let status = null;
-            let statusNotes = null;
-            if (!inServiceCheckbox.checked) {
-                if (statusStored.checked) status = 'Stored';
-                else if (statusScrapped.checked) status = 'Scrapped';
-                else if (statusWrittenOff.checked) status = 'Written off';
-                else if (statusCrashed.checked) status = 'Crashed';
-                else if (statusOther.checked) {
-                    status = 'Other';
-                    statusNotes = outOfServiceNotes.value;
+            try {
+                const registrationItems = document.querySelectorAll('#historyItemsContainer .history-reg-row');
+                if (registrationItems.length === 0) {
+                    alert('You must add at least one registration.');
+                    return;
                 }
-            }
 
-            let trips = [];
-            if (flownCheckbox.checked) {
-                document.querySelectorAll('#tripsContainer .history-item').forEach(item => {
-                    const departure = item.querySelector('.trip-departure').value;
-                    const arrival = item.querySelector('.trip-arrival').value;
-                    const date = item.querySelector('.trip-date').value;
-                    if (departure || arrival || date) {
-                        trips.push({ departure, arrival, date });
+                const hasCurrent = Array.from(document.querySelectorAll('#historyItemsContainer .current-reg-checkbox')).some(cb => cb.checked);
+                if (!hasCurrent) {
+                    alert('You must mark one registration as Current/Last Known.');
+                    return;
+                }
+
+                const typeInput = document.getElementById('aircraftType');
+                const aircraftTypeValue = (typeInput?.value || '').trim();
+                if (!aircraftTypeValue) {
+                    alert('Please enter an aircraft type.');
+                    typeInput?.focus();
+                    return;
+                }
+
+                const {
+                    historyItems,
+                    currentReg,
+                    currentOperator,
+                    currentIsSeen,
+                    missingReg
+                } = collectHistoryFromContainer(historyItemsContainer);
+
+                if (missingReg) {
+                    alert('All registrations must have a registration number.');
+                    return;
+                }
+
+                if (!currentReg) {
+                    alert('You must mark one registration as Current/Last Known.');
+                    return;
+                }
+
+                if (!(currentOperator || '').trim()) {
+                    alert('Please enter an operator for the current registration.');
+                    return;
+                }
+
+                const editIndexForDupes = parseInt(editIndexInput.value, 10);
+                const duplicateRegs = findDuplicateRegistrationsInForm(null, editIndexForDupes >= 0 ? editIndexForDupes : -1);
+                if (!confirmDuplicateRegistrationsOverride(duplicateRegs)) {
+                    return;
+                }
+
+                let status = null;
+                let statusNotes = null;
+                if (!inServiceCheckbox.checked) {
+                    if (statusStored.checked) status = 'Stored';
+                    else if (statusScrapped.checked) status = 'Scrapped';
+                    else if (statusWrittenOff.checked) status = 'Written off';
+                    else if (statusCrashed.checked) status = 'Crashed';
+                    else if (statusOther.checked) {
+                        status = 'Other';
+                        statusNotes = outOfServiceNotes.value;
+                    }
+                }
+
+                let trips = [];
+                if (flownCheckbox.checked) {
+                    document.querySelectorAll('#tripsContainer .history-item').forEach(item => {
+                        const departure = item.querySelector('.trip-departure').value;
+                        const arrival = item.querySelector('.trip-arrival').value;
+                        const date = item.querySelector('.trip-date').value;
+                        if (departure || arrival || date) {
+                            trips.push({ departure, arrival, date });
+                        }
+                    });
+                }
+
+                let sightings = [];
+                document.querySelectorAll('#sightingsContainer .history-item').forEach(item => {
+                    const location = item.querySelector('.sighting-location').value;
+                    const date = item.querySelector('.sighting-date').value;
+                    if (location || date) {
+                        sightings.push({ location, date });
                     }
                 });
-            }
 
-            let sightings = [];
-            document.querySelectorAll('#sightingsContainer .history-item').forEach(item => {
-                const location = item.querySelector('.sighting-location').value;
-                const date = item.querySelector('.sighting-date').value;
-                if (location || date) {
-                    sightings.push({ location, date });
+                const editIndex = parseInt(editIndexInput.value, 10);
+                const previousAircraft = editIndex >= 0 ? aircraftData[editIndex] : null;
+                const aircraft = {
+                    registration: currentReg,
+                    airline: currentOperator,
+                    type: aircraftTypeValue,
+                    inService: inServiceCheckbox.checked,
+                    status: status,
+                    outOfServiceNotes: statusNotes,
+                    history: historyItems,
+                    currentIsSeen: currentIsSeen,
+                    flown: flownCheckbox.checked,
+                    trips: trips,
+                    sightings: sightings,
+                    loggedDate: previousAircraft?.loggedDate || new Date().toISOString()
+                };
+
+                if (editIndex >= 0) {
+                    aircraftData[editIndex] = aircraft;
+                } else {
+                    aircraftData.push(aircraft);
                 }
-            });
+                try {
+                    saveAircraftData();
+                } catch (saveErr) {
+                    // Roll back in-memory change so a retry does not false-trigger "already logged".
+                    if (editIndex >= 0) aircraftData[editIndex] = previousAircraft;
+                    else aircraftData.pop();
+                    throw saveErr;
+                }
 
-            const editIndex = parseInt(editIndexInput.value, 10);
-            const previousAircraft = editIndex >= 0 ? aircraftData[editIndex] : null;
-            const aircraft = {
-                registration: currentReg,
-                airline: currentOperator,
-                type: aircraftTypeValue,
-                inService: inServiceCheckbox.checked,
-                status: status,
-                outOfServiceNotes: statusNotes,
-                history: historyItems,
-                currentIsSeen: currentIsSeen,
-                flown: flownCheckbox.checked,
-                trips: trips,
-                sightings: sightings,
-                loggedDate: previousAircraft?.loggedDate || new Date().toISOString()
-            };
+                try {
+                    syncFleetListsForSavedAircraft(aircraft);
+                } catch (syncErr) {
+                    console.error('Saved aircraft but fleet sync failed:', syncErr);
+                }
 
-            if (editIndex >= 0) {
-                aircraftData[editIndex] = aircraft;
-            } else {
-                aircraftData.push(aircraft);
+                if (window._pendingSeenNotLogged) {
+                    removeSeenNotLogged(
+                        window._pendingSeenNotLogged.airline,
+                        window._pendingSeenNotLogged.registration
+                    );
+                    window._pendingSeenNotLogged = null;
+                }
+
+                alert('Aircraft saved successfully!');
+                const backToTools = !!window._returnToToolsAfterEdit;
+                const backToFleets = !!window._returnToFleetsAfterEdit;
+                window._returnToToolsAfterEdit = false;
+                window._returnToFleetsAfterEdit = false;
+                if (backToTools) showLandingPage('tools');
+                else if (backToFleets) showLandingPage('fleets');
+                else showLandingPage();
+            } catch (err) {
+                console.error('Failed to save aircraft:', err);
+                alert(err?.message || 'Could not save aircraft. Please try again.');
             }
-            saveAircraftData();
-            syncFleetListsForSavedAircraft(aircraft);
-
-            if (window._pendingSeenNotLogged) {
-                removeSeenNotLogged(
-                    window._pendingSeenNotLogged.airline,
-                    window._pendingSeenNotLogged.registration
-                );
-                window._pendingSeenNotLogged = null;
-            }
-
-            alert('Aircraft saved successfully!');
-            const backToTools = !!window._returnToToolsAfterEdit;
-            const backToFleets = !!window._returnToFleetsAfterEdit;
-            window._returnToToolsAfterEdit = false;
-            window._returnToFleetsAfterEdit = false;
-            if (backToTools) showLandingPage('tools');
-            else if (backToFleets) showLandingPage('fleets');
-            else showLandingPage();
         }
 
         function logSearchMatchesFields(searchVal, registration, operator) {
