@@ -765,6 +765,21 @@
         .history-actions {
             display: flex;
             gap: 5px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .history-reorder {
+            display: inline-flex;
+            gap: 2px;
+        }
+        .history-reorder .button {
+            padding: 0.35rem 0.5rem;
+            min-width: 2rem;
+            line-height: 1;
+        }
+        .history-reorder .button:disabled {
+            opacity: 0.35;
+            cursor: default;
         }
         .history-container {
             margin-bottom: 1.25rem;
@@ -780,10 +795,17 @@
             text-transform: uppercase;
             letter-spacing: 0.07em;
             color: var(--text-muted);
-            margin-bottom: 0.65rem;
+            margin-bottom: 0.35rem;
         }
 
-        #otherRegsSection > #addHistoryBtn {
+        .history-order-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin: 0 0 0.65rem;
+            line-height: 1.35;
+        }
+
+        .history-container > button.button.secondary {
             width: auto;
             margin: 0 0 0.75rem;
         }
@@ -1551,6 +1573,7 @@
             
             <div class="history-container" id="otherRegsSection">
                 <div class="history-title">Registration</div>
+                <p class="history-order-hint">Newest / current / last known at the top, oldest at the bottom. Use ↑ ↓ to reorder.</p>
                 <button type="button" class="button secondary" id="addHistoryBtn">Add Another Registration</button>
                 <div id="historyItemsContainer"></div>
             </div>
@@ -1799,6 +1822,9 @@
             if (savedData) {
                 try {
                     aircraftData = JSON.parse(savedData) || [];
+                    if (migrateAircraftHistoryOrders(aircraftData)) {
+                        saveAircraftData();
+                    }
                     console.log("Loaded aircraft data:", aircraftData);
                 } catch (e) {
                     console.error("Error parsing aircraft data:", e);
@@ -1809,6 +1835,20 @@
         
         function saveAircraftData() {
             localStorage.setItem('aircraftData', JSON.stringify(aircraftData));
+        }
+
+        /** Ensure history is newest→oldest and includes the current/last-known entry. Returns true if anything changed. */
+        function migrateAircraftHistoryOrders(list) {
+            if (!Array.isArray(list)) return false;
+            let changed = false;
+            list.forEach(aircraft => {
+                if (!aircraft || typeof aircraft !== 'object') return;
+                const history = Array.isArray(aircraft.history) ? aircraft.history : [];
+                if (history.some(item => item.isCurrent)) return;
+                aircraft.history = getOrderedHistoryForForm(aircraft);
+                changed = true;
+            });
+            return changed;
         }
 
         function loadFleetData() {
@@ -3728,6 +3768,108 @@
             }
         }
 
+        function buildHistoryReorderControlsHtml() {
+            return `
+                <div class="history-reorder" role="group" aria-label="Reorder registration">
+                    <button type="button" class="button tertiary move-history-up-btn" aria-label="Move up" title="Move up">↑</button>
+                    <button type="button" class="button tertiary move-history-down-btn" aria-label="Move down" title="Move down">↓</button>
+                </div>
+            `;
+        }
+
+        function updateHistoryReorderControls(container) {
+            if (!container) return;
+            const rows = Array.from(container.querySelectorAll('.history-reg-row'));
+            rows.forEach((row, index) => {
+                const upBtn = row.querySelector('.move-history-up-btn');
+                const downBtn = row.querySelector('.move-history-down-btn');
+                if (upBtn) upBtn.disabled = index === 0;
+                if (downBtn) downBtn.disabled = index === rows.length - 1;
+            });
+        }
+
+        function moveHistoryRow(row, direction, container) {
+            if (!row || !container) return;
+            if (direction === 'up') {
+                const prev = row.previousElementSibling;
+                if (prev) container.insertBefore(row, prev);
+            } else if (direction === 'down') {
+                const next = row.nextElementSibling;
+                if (next) container.insertBefore(next, row);
+            }
+            updateHistoryReorderControls(container);
+        }
+
+        function attachHistoryReorderControls(historyItem, container) {
+            historyItem.querySelector('.move-history-up-btn')?.addEventListener('click', () => {
+                moveHistoryRow(historyItem, 'up', container);
+            });
+            historyItem.querySelector('.move-history-down-btn')?.addEventListener('click', () => {
+                moveHistoryRow(historyItem, 'down', container);
+            });
+        }
+
+        /** Ordered rows for the log form: newest/current first. Legacy data without isCurrent gets current prepended. */
+        function getOrderedHistoryForForm(aircraft) {
+            const history = Array.isArray(aircraft.history) ? aircraft.history : [];
+            const hasCurrentInHistory = history.some(item => item.isCurrent);
+            if (hasCurrentInHistory) {
+                return history.map(item => ({
+                    registration: item.registration || '',
+                    operator: item.operator || '',
+                    isCurrent: !!item.isCurrent,
+                    isSeen: !!item.isSeen
+                }));
+            }
+            return [
+                {
+                    registration: aircraft.registration || '',
+                    operator: aircraft.airline || '',
+                    isCurrent: true,
+                    isSeen: !!aircraft.currentIsSeen
+                },
+                ...history.map(item => ({
+                    registration: item.registration || '',
+                    operator: item.operator || '',
+                    isCurrent: false,
+                    isSeen: !!item.isSeen
+                }))
+            ];
+        }
+
+        /** Collect registration rows in DOM order, including the current/last-known entry. */
+        function collectHistoryFromContainer(container) {
+            const historyItems = [];
+            let currentReg = '';
+            let currentOperator = '';
+            let currentIsSeen = false;
+            let missingReg = false;
+
+            container.querySelectorAll('.history-reg-row').forEach(item => {
+                const reg = item.querySelector('.history-reg')?.value;
+                const operator = item.querySelector('.history-operator')?.value;
+                const isCurrent = !!item.querySelector('.current-reg-checkbox')?.checked;
+                const isSeen = !!item.querySelector('.seen-checkbox')?.checked;
+                if (!reg) {
+                    missingReg = true;
+                    return;
+                }
+                historyItems.push({
+                    registration: reg,
+                    operator: operator,
+                    isCurrent,
+                    isSeen
+                });
+                if (isCurrent) {
+                    currentReg = reg;
+                    currentOperator = operator || 'Unknown';
+                    currentIsSeen = isSeen;
+                }
+            });
+
+            return { historyItems, currentReg, currentOperator, currentIsSeen, missingReg };
+        }
+
         function addHistoryItem(registration, operator, isCurrent = false, isSeen = false) {
             const historyItem = document.createElement('div');
             historyItem.className = 'history-item history-reg-row';
@@ -3740,6 +3882,7 @@
                     <input type="text" class="history-reg reg-format" placeholder="Registration" value="${registration}" required>
                     ${buildHistoryOperatorComboboxHtml(operator)}
                     <div class="history-actions">
+                        ${buildHistoryReorderControlsHtml()}
                         <button type="button" class="button ${isInService ? 'current-reg-btn' : 'last-known-btn'} set-current-btn">${buttonText}</button>
                         <button type="button" class="button seen set-seen-btn">Seen</button>
                         <button type="button" class="button delete remove-history-btn">×</button>
@@ -3757,22 +3900,24 @@
             });
             attachRegistrationDuplicateCheck(regInputEl, null);
             attachHistoryOperatorCombobox(historyItem);
+            attachHistoryReorderControls(historyItem, historyItemsContainer);
             
             historyItem.querySelector('.remove-history-btn').addEventListener('click', () => {
                 if (document.querySelectorAll('#historyItemsContainer .history-reg-row').length > 1) {
                     historyItem.remove();
+                    updateHistoryReorderControls(historyItemsContainer);
                 } else {
                     alert("You must have at least one registration.");
                 }
             });
             
             historyItem.querySelector('.set-current-btn').addEventListener('click', function() {
-                document.querySelectorAll('.current-reg-checkbox').forEach(cb => {
+                document.querySelectorAll('#historyItemsContainer .current-reg-checkbox').forEach(cb => {
                     cb.checked = false;
                 });
                 historyItem.querySelector('.current-reg-checkbox').checked = true;
                 
-                document.querySelectorAll('.set-current-btn').forEach(btn => {
+                document.querySelectorAll('#historyItemsContainer .set-current-btn').forEach(btn => {
                     const isService = inServiceCheckbox.checked;
                     btn.textContent = isService ? 'Current' : 'Last Known';
                     btn.style.backgroundColor = '#5856d6';
@@ -3804,6 +3949,7 @@
             
             historyItem.querySelector('.set-seen-btn').style.backgroundColor = '#5ac8fa';
             historyItem.querySelector('.set-seen-btn').textContent = isSeen ? '✓ Seen' : 'Seen';
+            updateHistoryReorderControls(historyItemsContainer);
         }
         
         function resetHistoryItems() {
@@ -4058,20 +4204,9 @@
         }
 
         function buildRegistrationHistoryList(aircraft, mode) {
-            if (mode === 'full') {
-                return aircraft.history || [];
-            }
-            return [
-                {
-                    registration: aircraft.registration,
-                    operator: aircraft.airline,
-                    isCurrent: true,
-                    isSeen: !!aircraft.currentIsSeen
-                },
-                ...((aircraft.history || []).filter(item =>
-                    !(item.registration === aircraft.registration && item.operator === aircraft.airline)
-                ))
-            ];
+            // Prefer the saved user order (newest/current first when they reorder).
+            // Legacy records omit the current entry from history — compose it at the top.
+            return getOrderedHistoryForForm(aircraft);
         }
 
         function buildAircraftDetailsHtml(aircraft, display, options) {
@@ -4486,32 +4621,19 @@
                 return;
             }
 
-            const historyItems = [];
-            let currentReg = '';
-            let currentOperator = '';
             const aircraftTypeValue = (document.getElementById('aircraftType').value || '').trim();
+            const {
+                historyItems,
+                currentReg,
+                currentOperator,
+                currentIsSeen,
+                missingReg
+            } = collectHistoryFromContainer(historyItemsContainer);
 
-            registrationItems.forEach(item => {
-                const reg = item.querySelector('.history-reg')?.value;
-                const operator = item.querySelector('.history-operator')?.value;
-                const isCurrent = item.querySelector('.current-reg-checkbox').checked;
-                const isSeen = item.querySelector('.seen-checkbox').checked;
-                if (!reg) {
-                    alert('All registrations must have a registration number.');
-                    return;
-                }
-                if (isCurrent) {
-                    currentReg = reg;
-                    currentOperator = operator || 'Unknown';
-                } else {
-                    historyItems.push({
-                        registration: reg,
-                        operator: operator,
-                        isCurrent: false,
-                        isSeen: isSeen
-                    });
-                }
-            });
+            if (missingReg) {
+                alert('All registrations must have a registration number.');
+                return;
+            }
 
             if (!currentReg) {
                 alert('You must mark one registration as Current/Last Known.');
@@ -4557,9 +4679,6 @@
                     sightings.push({ location, date });
                 }
             });
-
-            const currentRow = Array.from(registrationItems).find(item => item.querySelector('.current-reg-checkbox').checked);
-            const currentIsSeen = currentRow ? currentRow.querySelector('.seen-checkbox').checked : false;
 
             const editIndex = parseInt(editIndexInput.value, 10);
             const previousAircraft = editIndex >= 0 ? aircraftData[editIndex] : null;
@@ -4829,29 +4948,16 @@
                     document.getElementById('outOfServiceNotes').value = aircraft.outOfServiceNotes || '';
                 }
             }
-            // Reset and fill registration history
+            // Reset and fill registration history in saved order (newest/current first)
             resetHistoryItems();
-            let hasCurrent = false;
-            if (aircraft.history?.length > 0) {
-                aircraft.history.forEach(item => {
-                    addHistoryItem(
-                        item.registration,
-                        item.operator,
-                        !!item.isCurrent,
-                        !!item.isSeen
-                    );
-                    if (item.isCurrent) hasCurrent = true;
-                });
-            }
-            // If no current found in history, use the main registration
-            if (!hasCurrent) {
+            getOrderedHistoryForForm(aircraft).forEach(item => {
                 addHistoryItem(
-                    aircraft.registration,
-                    aircraft.airline,
-                    true,
-                    !!aircraft.currentIsSeen
+                    item.registration,
+                    item.operator,
+                    !!item.isCurrent,
+                    !!item.isSeen
                 );
-            }
+            });
             // Fill trips
             resetTripItems();
             if (aircraft.flown && aircraft.trips && aircraft.trips.length > 0) {
@@ -4886,7 +4992,8 @@
             }
         }
         
-        const USER_DATA_EXPORT_VERSION = 2;
+        // v3: aircraft.history is ordered newest→oldest and includes the current/last-known entry
+        const USER_DATA_EXPORT_VERSION = 3;
 
         function isPlainObject(value) {
             return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -4921,6 +5028,7 @@
             // Legacy export: bare aircraft array
             if (Array.isArray(importedData)) {
                 aircraftData = importedData;
+                migrateAircraftHistoryOrders(aircraftData);
                 saveAircraftData();
                 return {
                     aircraftCount: aircraftData.length,
@@ -4953,6 +5061,7 @@
             const fullSnapshot = version >= 2;
 
             aircraftData = aircraft;
+            migrateAircraftHistoryOrders(aircraftData);
             saveAircraftData();
             const importedParts = ['aircraft'];
 
@@ -5178,46 +5287,18 @@
                     wrapper.querySelector('#outOfServiceNotes_random').value = aircraft.outOfServiceNotes || '';
                 }
             }
-            // Registration history
+            // Registration history in saved order (newest/current first)
             const historyItemsContainer = wrapper.querySelector('#historyItemsContainer_random');
             historyItemsContainer.innerHTML = '';
-            // Always ensure the main registration is present as current
-            let hasCurrent = false;
-            if (aircraft.history?.length > 0) {
-                const currentInHistory = aircraft.history.find(item => item.isCurrent);
-                if (currentInHistory) {
-                    addHistoryItemRandom(
-                        currentInHistory.registration,
-                        currentInHistory.operator,
-                        true,
-                        !!currentInHistory.isSeen,
-                        wrapper
-                    );
-                    hasCurrent = true;
-                }
-            }
-            if (!hasCurrent) {
+            getOrderedHistoryForForm(aircraft).forEach(item => {
                 addHistoryItemRandom(
-                    aircraft.registration,
-                    aircraft.airline,
-                    true,
-                    !!aircraft.currentIsSeen,
+                    item.registration,
+                    item.operator,
+                    !!item.isCurrent,
+                    !!item.isSeen,
                     wrapper
                 );
-            }
-            if (aircraft.history?.length > 0) {
-                aircraft.history.forEach(item => {
-                    if (!item.isCurrent) {
-                        addHistoryItemRandom(
-                            item.registration,
-                            item.operator,
-                            false,
-                            !!item.isSeen,
-                            wrapper
-                        );
-                    }
-                });
-            }
+            });
             // Trips
             const tripsContainer = wrapper.querySelector('#tripsContainer_random');
             tripsContainer.innerHTML = '';
@@ -5255,31 +5336,23 @@
                 return;
             }
             // Similar to handleFormSubmit, but for the random form
-            const historyItems = [];
-            let currentReg = '';
-            let currentOperator = '';
             const aircraftTypeValue = (wrapper.querySelector('#aircraftType_random')?.value || '').trim();
-            wrapper.querySelectorAll('#historyItemsContainer_random .history-reg-row').forEach(item => {
-                const reg = item.querySelector('.history-reg')?.value;
-                const operator = item.querySelector('.history-operator')?.value;
-                const isCurrent = item.querySelector('.current-reg-checkbox').checked;
-                const isSeen = item.querySelector('.seen-checkbox').checked;
-                if (!reg) {
-                    alert("All registrations must have a registration number.");
-                    throw new Error("Missing registration");
-                }
-                if (isCurrent) {
-                    currentReg = reg;
-                    currentOperator = operator || 'Unknown';
-                } else {
-                    historyItems.push({
-                        registration: reg,
-                        operator: operator,
-                        isCurrent: false,
-                        isSeen: isSeen
-                    });
-                }
-            });
+            const historyContainer = wrapper.querySelector('#historyItemsContainer_random');
+            const {
+                historyItems,
+                currentReg,
+                currentOperator,
+                currentIsSeen,
+                missingReg
+            } = collectHistoryFromContainer(historyContainer);
+            if (missingReg) {
+                alert("All registrations must have a registration number.");
+                throw new Error("Missing registration");
+            }
+            if (!currentReg) {
+                alert('You must mark one registration as Current/Last Known.');
+                throw new Error("Missing current registration");
+            }
             let status = null;
             let statusNotes = null;
             if (!wrapper.querySelector('#inService_random').checked) {
@@ -5330,7 +5403,7 @@
                 status: status,
                 outOfServiceNotes: statusNotes,
                 history: historyItems,
-                currentIsSeen: wrapper.querySelector('.current-reg-checkbox').checked, // Store the current seen status
+                currentIsSeen: currentIsSeen,
                 flown: wrapper.querySelector('#flown_random').checked,
                 trips: trips,
                 sightings: sightings,
@@ -5355,6 +5428,7 @@
                     <input type="text" class="history-reg reg-format" placeholder="Registration" value="${registration}" required>
                     ${buildHistoryOperatorComboboxHtml(operator)}
                     <div class="history-actions">
+                        ${buildHistoryReorderControlsHtml()}
                         <button type="button" class="button ${isInService ? 'current-reg-btn' : 'last-known-btn'} set-current-btn">${buttonText}</button>
                         <button type="button" class="button seen set-seen-btn">Seen</button>
                         <button type="button" class="button delete remove-history-btn">×</button>
@@ -5370,19 +5444,21 @@
             });
             attachRegistrationDuplicateCheck(regInputElRandom, wrapper);
             attachHistoryOperatorCombobox(historyItem);
+            attachHistoryReorderControls(historyItem, historyItemsContainer);
             historyItem.querySelector('.remove-history-btn').addEventListener('click', () => {
                 if (wrapper.querySelectorAll('#historyItemsContainer_random .history-reg-row').length > 1) {
                     historyItem.remove();
+                    updateHistoryReorderControls(historyItemsContainer);
                 } else {
                     alert("You must have at least one registration.");
                 }
             });
             historyItem.querySelector('.set-current-btn').addEventListener('click', function() {
-                wrapper.querySelectorAll('.current-reg-checkbox').forEach(cb => {
+                wrapper.querySelectorAll('#historyItemsContainer_random .current-reg-checkbox').forEach(cb => {
                     cb.checked = false;
                 });
                 historyItem.querySelector('.current-reg-checkbox').checked = true;
-                wrapper.querySelectorAll('.set-current-btn').forEach(btn => {
+                wrapper.querySelectorAll('#historyItemsContainer_random .set-current-btn').forEach(btn => {
                     const isService = wrapper.querySelector('#inService_random').checked;
                     btn.textContent = isService ? 'Current' : 'Last Known';
                     btn.style.backgroundColor = '#5856d6';
@@ -5409,6 +5485,7 @@
             }
             historyItem.querySelector('.set-seen-btn').style.backgroundColor = '#5ac8fa';
             historyItem.querySelector('.set-seen-btn').textContent = isSeen ? '✓ Seen' : 'Seen';
+            updateHistoryReorderControls(historyItemsContainer);
         }
         function addTripItemRandom(departure, arrival, date, isFirst, wrapper) {
             const tripsContainer = wrapper.querySelector('#tripsContainer_random');
